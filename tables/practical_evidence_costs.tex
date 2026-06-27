@@ -1,0 +1,21 @@
+\begin{table*}[!t]
+\centering
+\scriptsize
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{llllll}
+\toprule
+Family & Evidence & Time & Memory & External tool & Requirement \\
+\midrule
+Lexical & Token/edit/length evidence & 0.08 ms & Low & No & Any text candidate \\
+Parser/AST & Syntax and AST-shape evidence & 0.08 ms & Low & Tree-sitter & Supported parser \\
+Control/CFG & Branch, loop, and CFG-size proxies & 0.08 ms & Low & Parser/regex & Supported syntax or text fallback \\
+API/Identifier & Calls, APIs, names, and role proxies & 0.08 ms & Low & No & Source and candidate text \\
+Retrieval proxy & Sequence-similarity retrieval feature & 0.08 ms & Low & No index in current artifact & Pair text only \\
+Execution & Example or full test execution & 10.00 ms & High & Runtime/sandbox & Tests and target runtime \\
+\bottomrule
+\end{tabular}
+}
+\vspace{0.5em}
+\caption{Practical evidence-cost model for the current artifact, separating measured extraction time from infrastructure requirements.}
+\label{tab:practical-evidence-costs}
+\end{table*}

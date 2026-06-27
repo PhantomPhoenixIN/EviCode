@@ -146,6 +146,87 @@ def make_evidence_ladder_figure(path: Path) -> None:
     plt.close(fig)
 
 
+def make_evidence_landscape_figure(path: Path) -> None:
+    """Create a conceptual evidence landscape figure distinct from the pipeline."""
+    fig, ax = plt.subplots(figsize=(7.2, 4.8))
+    ax.axis("off")
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
+    tiers = [
+        (
+            0.70,
+            "STATIC EVIDENCE",
+            "Lexical, syntax, AST, CFG,\noperators, identifiers, data flow, APIs",
+            "Low cost | broad coverage | weak certification",
+            "#4C78A8",
+        ),
+        (
+            0.42,
+            "EXTERNAL EVIDENCE",
+            "Retrieval and similar solved programs\nwhen an index or corpus is available",
+            "Medium cost | depends on corpus quality",
+            "#B279A2",
+        ),
+        (
+            0.14,
+            "DYNAMIC EVIDENCE",
+            "Example tests, full test suites,\nruntime behavior, coverage signals",
+            "Highest information | highest environment cost",
+            "#2CA25F",
+        ),
+    ]
+    for y_coord, title, body, footer, color in tiers:
+        box = patches.FancyBboxPatch(
+            (0.14, y_coord),
+            0.72,
+            0.18,
+            boxstyle="round,pad=0.012,rounding_size=0.012",
+            linewidth=1.2,
+            edgecolor=color,
+            facecolor=color,
+            alpha=0.10,
+        )
+        ax.add_patch(box)
+        ax.text(0.18, y_coord + 0.135, title, fontsize=11, fontweight="bold", color=color)
+        ax.text(0.18, y_coord + 0.082, body, fontsize=9.2, va="center")
+        ax.text(0.18, y_coord + 0.028, footer, fontsize=8.5, color="#4a5568")
+    ax.annotate(
+        "Increasing semantic observability",
+        xy=(0.90, 0.23),
+        xytext=(0.90, 0.83),
+        arrowprops={"arrowstyle": "<|-", "linewidth": 1.2, "color": "#34495e"},
+        ha="center",
+        va="center",
+        rotation=90,
+        fontsize=9,
+        color="#34495e",
+    )
+    ax.annotate(
+        "Increasing infrastructure assumptions",
+        xy=(0.07, 0.23),
+        xytext=(0.07, 0.83),
+        arrowprops={"arrowstyle": "<|-", "linewidth": 1.2, "color": "#34495e"},
+        ha="center",
+        va="center",
+        rotation=90,
+        fontsize=9,
+        color="#34495e",
+    )
+    ax.text(0.5, 0.96, "Evidence Landscape for Generated-Code Verification", ha="center", va="top", fontsize=13, fontweight="bold")
+    ax.text(
+        0.5,
+        0.035,
+        "The design problem is deciding which evidence is worth paying for at each decision point.",
+        ha="center",
+        va="bottom",
+        fontsize=8.8,
+        color="#4a5568",
+    )
+    fig.tight_layout()
+    fig.savefig(path)
+    plt.close(fig)
+
+
 def main() -> int:
     """Generate paper artifacts."""
     args = parse_args()
@@ -164,6 +245,7 @@ def main() -> int:
     tables.mkdir(exist_ok=True)
     figures.mkdir(exist_ok=True)
     make_evidence_ladder_figure(figures / "evidence_ladder.pdf")
+    make_evidence_landscape_figure(figures / "evidence_landscape.pdf")
 
     dataset_stats = pd.DataFrame(
         [
@@ -401,6 +483,51 @@ def main() -> int:
             ),
             encoding="utf-8",
         )
+        by_system = metrics.set_index("system")
+        interactions = [
+            ("FullExec+Static", "execution_full_only", "static_plus_full_execution"),
+            ("ExampleExec+Static", "execution_example_only", "static_plus_example_execution"),
+            ("FullExec+AllStatic", "execution_full_only", "all_evidence"),
+            ("WeakProxy+Syntax", "weak_proxy_only", "syntactic_plus_weak_proxy"),
+            ("NormOp+WeakProxy", "normalized_operator_only", "normalized_operator_plus_weak_proxy"),
+        ]
+        interaction_rows = []
+        for label, base, fused in interactions:
+            if base in by_system.index and fused in by_system.index:
+                interaction_rows.append(
+                    {
+                        "Interaction": label,
+                        "Base F1": by_system.loc[base, "f1"],
+                        "Fused F1": by_system.loc[fused, "f1"],
+                        "Delta F1": by_system.loc[fused, "f1"] - by_system.loc[base, "f1"],
+                        "Delta AUC": by_system.loc[fused, "roc_auc"] - by_system.loc[base, "roc_auc"],
+                    }
+                )
+        if interaction_rows:
+            interaction_frame = pd.DataFrame(interaction_rows)
+            (tables / "evidence_interactions.tex").write_text(
+                latex_table(
+                    interaction_frame,
+                    "Marginal interaction effects for selected evidence combinations, comparing fused configurations against their closest single-source baselines.",
+                    "tab:evidence-interactions",
+                ),
+                encoding="utf-8",
+            )
+            plot_frame = interaction_frame.melt(
+                id_vars=["Interaction"],
+                value_vars=["Delta F1", "Delta AUC"],
+                var_name="Metric",
+                value_name="Delta",
+            )
+            plt.figure(figsize=(7.0, 3.8))
+            sns.barplot(data=plot_frame, x="Delta", y="Interaction", hue="Metric")
+            plt.axvline(0, color="0.3", linewidth=0.8)
+            plt.xlabel("Marginal change over baseline")
+            plt.ylabel("")
+            plt.legend(loc="lower right", fontsize=8)
+            plt.tight_layout()
+            plt.savefig(figures / "evidence_interactions.pdf")
+            plt.close()
     if (analysis_dir / "evidence_redundancy_correlation.csv").exists():
         redundancy = pd.read_csv(analysis_dir / "evidence_redundancy_correlation.csv", index_col=0)
         ordered = [
@@ -488,6 +615,25 @@ def main() -> int:
                 cost_table.head(6),
                 "Cost-normalized evidence summary showing extraction time, informativeness, and mutual information per millisecond where label information is available.",
                 "tab:evidence-costs",
+            ),
+            encoding="utf-8",
+        )
+        practical_cost = pd.DataFrame(
+            [
+                ("Lexical", "Token/edit/length evidence", "0.08 ms", "Low", "No", "Any text candidate"),
+                ("Parser/AST", "Syntax and AST-shape evidence", "0.08 ms", "Low", "Tree-sitter", "Supported parser"),
+                ("Control/CFG", "Branch, loop, and CFG-size proxies", "0.08 ms", "Low", "Parser/regex", "Supported syntax or text fallback"),
+                ("API/Identifier", "Calls, APIs, names, and role proxies", "0.08 ms", "Low", "No", "Source and candidate text"),
+                ("Retrieval proxy", "Sequence-similarity retrieval feature", "0.08 ms", "Low", "No index in current artifact", "Pair text only"),
+                ("Execution", "Example or full test execution", "10.00 ms", "High", "Runtime/sandbox", "Tests and target runtime"),
+            ],
+            columns=["Family", "Evidence", "Time", "Memory", "External tool", "Requirement"],
+        )
+        (tables / "practical_evidence_costs.tex").write_text(
+            latex_table_wide(
+                practical_cost,
+                "Practical evidence-cost model for the current artifact, separating measured extraction time from infrastructure requirements.",
+                "tab:practical-evidence-costs",
             ),
             encoding="utf-8",
         )

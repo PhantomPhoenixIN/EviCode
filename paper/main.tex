@@ -81,6 +81,15 @@ The conceptual view is an evidence ladder rather than a single-score pipeline. A
   \label{fig:evidence-ladder}
 \end{figure}
 
+Figure~\ref{fig:evidence-landscape} complements the ladder by showing the design space rather than the processing flow. Static evidence is broad and inexpensive but weak for certification. External evidence such as retrieval depends on corpus availability. Dynamic evidence has the strongest semantic observability but also the strongest runtime, sandboxing, and test-availability assumptions. This landscape motivates the paper's cost-aware framing: a verifier should not ask only which evidence is most accurate, but which evidence is worth acquiring for a given decision.
+
+\begin{figure}[!htbp]
+  \centering
+  \IfFileExists{../figures/evidence_landscape.pdf}{\includegraphics[width=\linewidth]{../figures/evidence_landscape.pdf}}{\fbox{Evidence landscape figure not yet generated}}
+  \caption{Evidence landscape for generated-code verification, contrasting static, external, and dynamic evidence by semantic observability and infrastructure assumptions.}
+  \label{fig:evidence-landscape}
+\end{figure}
+
 \section{Related Work}
 \subsection{Textual and Code-Aware Metrics}
 BLEU was originally designed for machine translation, where n-gram overlap often correlates with output quality~\cite{papineni2002bleu}. Its adoption in code generation was natural but imperfect: code has syntax, types, APIs, and execution semantics that are not captured by token overlap alone. CrystalBLEU improves robustness by discounting common n-grams that appear across many solutions~\cite{efstathiou2017crystalbleu}, while CodeBLEU combines lexical overlap with AST and data-flow-inspired components~\cite{ren2020codebleu}. These metrics are important because they show a clear historical movement from text toward structure. EviCode continues that movement but changes the question from ``what is the best scalar metric?'' to ``which evidence sources explain verification performance and failure?''
@@ -495,8 +504,11 @@ Complementarity matters because a verifier should not collect many names for the
 This changes how static evidence should be interpreted. Static evidence is not a weaker substitute for execution; it is a filter and explanation layer. If static evidence is high but execution fails, the disagreement identifies a subtle behavioral failure hidden behind plausible form. If static evidence is low before execution, the system can deprioritize expensive testing or route the candidate to repair. Overall, Table~\ref{tab:evidence-complementarity} shows why evidence integration differs from metric aggregation: the goal is not to maximize the number of signals, but to combine signals whose disagreements reveal something about correctness.
 
 \IfFileExists{../tables/evidence_complementarity.tex}{\input{../tables/evidence_complementarity.tex}}{}
+\IfFileExists{../tables/evidence_interactions.tex}{\input{../tables/evidence_interactions.tex}}{}
 \IfFileExists{../tables/static_ablation.tex}{\input{../tables/static_ablation.tex}}{}
 \IfFileExists{../tables/evidence_importance.tex}{\input{../tables/evidence_importance.tex}}{}
+
+Table~\ref{tab:evidence-interactions} and Figure~\ref{fig:evidence-interactions} make complementarity more concrete by measuring selected marginal changes. The key pattern is that static evidence is most valuable when it changes the confidence structure rather than the thresholded decision. Adding static evidence to full execution only slightly changes F1, but it improves AUC because the fused score can rank candidates more finely than a binary execution outcome. Conversely, weak static sources can show larger F1 changes when fused with other static gates, because neither source is sufficient alone. This supports the paper's central claim: evidence sources are not interchangeable metrics; they interact according to what uncertainty each source reduces.
 
 \subsubsection{Ablation Reveals Behavior-Proximal Static Signals}
 The ablation and importance results make the complementarity story concrete. Table~\ref{tab:static-ablation} shows what is lost when individual static sources are removed, while Table~\ref{tab:evidence-importance} and Figure~\ref{fig:evidence-importance} show which sources most influence the transparent fusion model. Full execution has the largest coefficient magnitude, 3.265, as expected. Below execution, token overlap and operator patterns have the strongest influence, 0.745 and 0.714. Normalized function count and normalized CFG node count follow with coefficients 0.576 and 0.424, while normalized operator-family similarity, example execution, and normalized expression distribution also remain visible in the model. The more interesting result is that operator patterns and token overlap matter more than broad AST node similarity. This challenges a common assumption in code intelligence that richer structural representation necessarily approximates semantics more closely. Many semantic errors are local computational changes, such as incorrect operators, predicates, API calls, or value roles, that preserve overall tree structure. Future metrics should therefore prioritize behavior-proximal evidence over representation complexity alone.
@@ -508,6 +520,13 @@ The leave-one-out results therefore support a stronger claim than ``structure he
   \IfFileExists{../figures/evidence_complementarity_heatmap.pdf}{\includegraphics[width=\linewidth]{../figures/evidence_complementarity_heatmap.pdf}}{\fbox{Complementarity heatmap not yet generated}}
   \caption{Correlation among implemented evidence features; high-correlation blocks indicate redundant signals, while lower correlation suggests complementary evidence for fusion.}
   \label{fig:evidence-complementarity}
+\end{figure}
+
+\begin{figure}[!htbp]
+  \centering
+  \IfFileExists{../figures/evidence_interactions.pdf}{\includegraphics[width=\linewidth]{../figures/evidence_interactions.pdf}}{\fbox{Evidence interaction figure not yet generated}}
+  \caption{Marginal F1 and ROC-AUC changes for selected evidence interactions, showing when fused evidence improves thresholded decisions, ranking, or both.}
+  \label{fig:evidence-interactions}
 \end{figure}
 
 \subsubsection{Correlation Separates Redundancy From New Evidence}
@@ -540,12 +559,13 @@ Within the supported settings, the first dynamic signal has the largest payoff. 
 
 \IfFileExists{../tables/execution_budget_results.tex}{\input{../tables/execution_budget_results.tex}}{}
 \IfFileExists{../tables/evidence_costs.tex}{\input{../tables/evidence_costs.tex}}{}
+\IfFileExists{../tables/practical_evidence_costs.tex}{\input{../tables/practical_evidence_costs.tex}}{}
 \IfFileExists{../tables/static_evidence_value.tex}{\input{../tables/static_evidence_value.tex}}{}
 
 \subsubsection{Cost Changes Which Evidence Is Worth Paying For}
-Cost changes the interpretation of accuracy, but raw elapsed time alone is not sufficiently informative. Table~\ref{tab:evidence-costs} shows that full execution has the largest MI, 0.411, while example execution follows with MI 0.361. Static sources have lower absolute information but are cheap to extract. The stronger question is therefore which low-cost static feature exposes a distinct semantic failure mode. Table~\ref{tab:static-evidence-value} answers that question directly: normalized operator families capture local computation, normalized control profiles capture execution-shape drift, statement distributions capture structural organization, identifier-role distributions capture value responsibilities, and data-flow proxies capture assignment/use structure. Weak surface proxies are retained for triage but no longer treated as primary semantic evidence.
+Cost changes the interpretation of accuracy, but raw elapsed time alone is not sufficiently informative. Table~\ref{tab:evidence-costs} shows that full execution has the largest MI, 0.411, while example execution follows with MI 0.361. Static sources have lower absolute information but are cheap to extract. Table~\ref{tab:practical-evidence-costs} adds the engineering view that elapsed time hides infrastructure assumptions: parser-backed evidence needs language support, execution needs tests and a target runtime, and retrieval would require an index if implemented beyond the current lightweight similarity proxy. The stronger question is therefore which low-cost static feature exposes a distinct semantic failure mode. Table~\ref{tab:static-evidence-value} answers that question directly: normalized operator families capture local computation, normalized control profiles capture execution-shape drift, statement distributions capture structural organization, identifier-role distributions capture value responsibilities, and data-flow proxies capture assignment/use structure. Weak surface proxies are retained for triage but no longer treated as primary semantic evidence.
 
-This reframes cost-benefit analysis as cost-normalized evidence design. A verifier should be evaluated not only by its best possible score, but also by the infrastructure it assumes and the kind of failure it can expose. Cheap evidence can reject malformed, API-incoherent, or suspicious candidates early, while expensive execution can be reserved for candidates whose correctness matters or whose static evidence is ambiguous. Overall, Tables~\ref{tab:evidence-costs} and~\ref{tab:static-evidence-value} show that the relevant engineering question is not ``which evidence is best?'' but ``which evidence should be paid for at which stage of verification?''
+This reframes cost-benefit analysis as cost-normalized evidence design. A verifier should be evaluated not only by its best possible score, but also by the infrastructure it assumes and the kind of failure it can expose. Cheap evidence can reject malformed, API-incoherent, or suspicious candidates early, while expensive execution can be reserved for candidates whose correctness matters or whose static evidence is ambiguous. Overall, Tables~\ref{tab:evidence-costs},~\ref{tab:practical-evidence-costs}, and~\ref{tab:static-evidence-value} show that the relevant engineering question is not ``which evidence is best?'' but ``which evidence should be paid for at which stage of verification?''
 
 \begin{figure}[!htbp]
   \centering
