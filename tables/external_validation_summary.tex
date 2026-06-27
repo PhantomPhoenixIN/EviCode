@@ -1,0 +1,19 @@
+\begin{table}[!htbp]
+\centering
+\scriptsize
+\begin{tabular}{lrrrr}
+\toprule
+Dataset & Rows & F1 & AUC & Conf. \\
+\midrule
+CodeXGLUE-CS-Java & 400 & 0.291 & 0.989 & 0.097 \\
+HumanEvalX-cpp-Java & 328 & 0.000 & 0.833 & 0.000 \\
+HumanEvalX-go-Java & 328 & 0.000 & 0.957 & 0.005 \\
+XLCoST-cpp-Java & 30 & 0.000 & 0.920 & 0.002 \\
+XLCoST-csharp-Java & 42 & 0.091 & 1.000 & 0.064 \\
+XLCoST-python-Java & 12 & 0.000 & 0.722 & 0.002 \\
+\bottomrule
+\end{tabular}
+\vspace{0.5em}
+\caption{External aligned-pair validation using public translation corpora; positives are aligned pairs and negatives are deterministic task mismatches.}
+\label{tab:external-validation}
+\end{table}

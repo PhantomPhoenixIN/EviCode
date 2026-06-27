@@ -4,7 +4,7 @@
 
 EviCode studies semantic verification as an **evidence decomposition** problem. Instead of asking only whether a generated program is correct, EviCode asks which evidence sources support that decision: syntax validity, normalized control-flow structure, normalized structural statistics, operator-family profiles, identifier-role distributions, data-flow proxies, and execution.
 
-The current artifact evaluates this idea on HumanEval-X translation verification and an external Python-to-Java LLM prediction set from DeepSeekCoder, QwenCoder, and StarCoder.
+The current artifact evaluates this idea on HumanEval-X translation verification, external source-to-Java LLM predictions from DeepSeekCoder, QwenCoder, and StarCoder, and public aligned-pair corpora from CodeXGLUE, HumanEval-X extra source languages, and XLCoST.
 
 ![EviCode architecture](EviCode_Block_Diagram.png)
 
@@ -39,7 +39,8 @@ Family ablation shows that the families contribute different kinds of evidence. 
 | Underlying tasks | 164 |
 | Positive pairs | 984 |
 | Controlled negative pairs | 1,968 |
-| External Python-to-Java LLM translations | 7,312 |
+| External source-to-Java LLM translations | 37,650 |
+| External aligned-pair stress-test rows | 1,140 |
 | LLM generators | DeepSeekCoder, QwenCoder, StarCoder |
 
 ## Results and Analysis
@@ -50,9 +51,9 @@ The first result is a discontinuity between representation-based and behavior-ba
 
 | Evidence group | Accuracy | F1 | ROC-AUC |
 |---|---:|---:|---:|
-| Lexical | 0.682 | 0.362 | 0.732 |
-| Syntactic | 0.666 | 0.096 | 0.636 |
-| Structural | 0.692 | 0.281 | 0.630 |
+| Lexical | 0.667 | 0.000 | 0.552 |
+| Syntactic | 0.667 | 0.000 | 0.589 |
+| Structural | 0.681 | 0.364 | 0.653 |
 | Semantic-static | 0.670 | 0.252 | 0.717 |
 | Dynamic | 0.929 | 0.904 | 0.947 |
 | Static fusion | 0.743 | 0.558 | 0.801 |
@@ -103,7 +104,7 @@ Complementarity is more important than feature count. Highly correlated blocks s
 
 ![Execution budget comparison](docs/readme_assets/execution_budget_curve.png)
 
-HumanEval-X exposes example and full tests, but not normalized individual test budgets. The supported evidence settings still show an important pattern: the first behavioral signal produces the largest gain. Static-only verification reaches F1 0.526, example execution reaches 0.862, and full execution reaches 0.885.
+HumanEval-X exposes example and full tests, but not normalized individual test budgets. The supported evidence settings still show an important pattern: the first behavioral signal produces the largest gain. Static-only verification reaches F1 0.558, example execution reaches 0.862, and full execution reaches 0.885.
 
 ![Cost-information analysis](docs/readme_assets/cost_information_pareto.png)
 
@@ -115,22 +116,40 @@ Cost changes what evidence is worth collecting. Execution has the strongest abso
 
 Evidence decomposition turns a binary incorrect label into diagnosable categories: syntax failure, API mismatch, data-flow mismatch, control-flow mismatch, and execution disagreement. This is important for repair and review workflows because the next action depends on why a candidate failed.
 
-### RQ5: External LLM Validation and Calibration
+### RQ5: External Validation and Calibration
 
 | Generator | Rows | Empirical correctness | Mean confidence | ROC-AUC |
 |---|---:|---:|---:|---:|
-| DeepSeekCoder | 3,113 | 0.271 | 0.210 | 0.773 |
-| QwenCoder | 1,740 | 0.190 | 0.254 | 0.664 |
-| StarCoder | 2,459 | 0.091 | 0.099 | 0.296 |
-| All external translations | 7,312 | 0.191 | 0.183 | 0.712 |
+| DeepSeekCoder | 18,007 | 0.259 | 0.037 | 0.500 |
+| QwenCoder | 8,966 | 0.191 | 0.057 | 0.445 |
+| StarCoder | 10,677 | 0.078 | 0.187 | 0.265 |
+| All source-to-Java translations | 37,650 | 0.191 | 0.084 | 0.406 |
 
 ![LLM calibration](docs/readme_assets/llm_calibration_curve.png)
 
-Static EviCode confidence transfers partially to real Python-to-Java LLM translations. It is not strong enough to replace execution, but it is useful as a triage and calibration signal.
+When the static verifier is trained only on HumanEval-X Python-to-Java examples, it transfers moderately to Python-to-Java LLM translations but weakly to unseen source languages. This is an important negative result: language-normalized features do not automatically imply calibrated language-agnostic verification.
+
+| Source | Rows | Empirical correctness | Mean confidence | ROC-AUC |
+|---|---:|---:|---:|---:|
+| Python | 7,312 | 0.191 | 0.167 | 0.695 |
+| C# | 5,819 | 0.132 | 0.090 | 0.427 |
+| Ruby | 5,852 | 0.156 | 0.029 | 0.365 |
+| Swift | 1,297 | 0.357 | 0.092 | 0.361 |
+| Kotlin | 3,641 | 0.195 | 0.082 | 0.338 |
+| C | 6,662 | 0.205 | 0.064 | 0.309 |
+| C++ | 6,962 | 0.223 | 0.056 | 0.307 |
 
 ![Confidence by graded LLM outcome](docs/readme_assets/llm_confidence_by_score.png)
 
-Confidence increases monotonically across graded outcomes: unusable translations, parsable-but-not-compilable translations, compilable-but-wrong translations, and functionally correct translations.
+The graded LLM outcomes reveal calibration failure under broad source-language shift: parse-only candidates receive higher mean confidence than functionally correct candidates. This supports the paper's more careful claim that evidence decomposition is useful, but fusion weights must be trained or calibrated for the language families where they will be deployed.
+
+| External aligned-pair dataset | Rows | F1 | ROC-AUC |
+|---|---:|---:|---:|
+| CodeXGLUE C#-Java | 400 | 0.291 | 0.989 |
+| HumanEval-X C++-Java | 328 | 0.000 | 0.833 |
+| HumanEval-X Go-Java | 328 | 0.000 | 0.957 |
+| XLCoST C++-Java | 30 | 0.000 | 0.920 |
+| XLCoST C#-Java | 42 | 0.091 | 1.000 |
 
 ### Metrics Are Evidence, Not Judges
 
@@ -141,8 +160,8 @@ Confidence increases monotonically across graded outcomes: unusable translations
 | TF-IDF | 0.530 | 0.727 | Better ranking, still non-semantic |
 | CodeBLEU | 0.559 | 0.728 | Structure-aware similarity proxy |
 | Execution | 0.885 | 0.934 | Behavior-observing evidence |
-| EviCode Static | 0.526 | 0.807 | Static ranking and triage |
-| EviCode All | 0.894 | 0.958 | Evidence-fused confidence |
+| EviCode Static | 0.558 | 0.801 | Static ranking and triage |
+| EviCode All | 0.869 | 0.959 | Evidence-fused confidence |
 
 ![Metric comparison](docs/readme_assets/metric_comparison_matrix.png)
 
@@ -156,7 +175,7 @@ The metric comparison shows why similarity metrics should be interpreted as part
 | `scripts/` | Resume-safe dataset, evidence, experiment, statistics, artifact, and paper scripts |
 | `configs/` | Reproducible experiment configurations |
 | `datasets/processed/` | Processed HumanEval-X verification examples |
-| `datasets/Predictions_by_LLMs/` | External Python-to-Java LLM predictions tracked with Git LFS |
+| `datasets/Predictions_by_LLMs/` | External source-to-Java LLM predictions tracked with Git LFS |
 | `experiments/` | Evidence and fusion outputs |
 | `statistics/` | Bootstrap and McNemar validation outputs |
 | `figures/`, `tables/` | Generated paper artifacts |
@@ -199,7 +218,8 @@ python scripts/refresh_static_evidence.py --config configs/humanevalx.yaml --exa
 python scripts/run_experiments.py --config configs/humanevalx.yaml --input experiments/humanevalx/evidence_rich/evidence.jsonl --output-dir experiments/humanevalx/fusion_rich --resume
 python scripts/statistical_analysis.py --config configs/humanevalx.yaml --predictions experiments/humanevalx/fusion_rich/predictions.csv --output-dir statistics/humanevalx_rich --resume
 python scripts/analyze_evidence.py --config configs/humanevalx.yaml --examples datasets/processed/humanevalx/verification_examples.jsonl --evidence experiments/humanevalx/evidence_rich/evidence.jsonl --metrics experiments/humanevalx/fusion_rich/metrics.csv --output-dir results/analysis --resume
-python scripts/evaluate_llm_predictions.py --config configs/humanevalx.yaml --predictions-dir datasets/Predictions_by_LLMs --train-evidence experiments/humanevalx/evidence_rich/evidence.jsonl --output-dir results/llm_predictions --resume
+python scripts/evaluate_llm_predictions.py --config configs/humanevalx.yaml --predictions-dir datasets/Predictions_by_LLMs --train-evidence experiments/humanevalx/evidence_rich/evidence.jsonl --output-dir results/llm_predictions --source-languages all --target-language Java --train-source-languages python --train-target-languages java --resume
+python scripts/external_dataset_validation.py --config configs/humanevalx.yaml --train-evidence experiments/humanevalx/evidence_rich/evidence.jsonl --output-dir results/external_validation --train-source-language python --train-target-language java --resume
 python scripts/generate_artifacts.py --config configs/humanevalx.yaml --dataset datasets/processed/humanevalx/verification_examples.jsonl --evidence experiments/humanevalx/evidence_rich/evidence.jsonl --metrics experiments/humanevalx/fusion_rich/metrics.csv --statistics-dir statistics/humanevalx_rich --output-dir results/humanevalx_rich --resume
 python scripts/build_paper.py --config configs/humanevalx.yaml --output-dir paper/output --resume --force
 ```

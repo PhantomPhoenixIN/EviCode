@@ -29,6 +29,7 @@ TREE_SITTER_LANGUAGES = {
     "js": Language(tree_sitter_javascript.language()),
     "javascript": Language(tree_sitter_javascript.language()),
 }
+TREE_SITTER_PARSERS: dict[str, Parser] = {}
 
 
 def identifiers(code: str) -> set[str]:
@@ -89,7 +90,10 @@ def tree_sitter_counts(code: str, language: str) -> tuple[bool, Counter[str], in
     ts_language = TREE_SITTER_LANGUAGES.get(language.lower())
     if ts_language is None:
         return False, Counter(), 0, Counter()
-    parser = Parser(ts_language)
+    parser = TREE_SITTER_PARSERS.get(language.lower())
+    if parser is None:
+        parser = Parser(ts_language)
+        TREE_SITTER_PARSERS[language.lower()] = parser
     tree = parser.parse(code.encode("utf-8", errors="ignore"))
     counts: Counter[str] = Counter()
     depth_counts: Counter[str] = Counter()

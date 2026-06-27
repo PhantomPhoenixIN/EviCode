@@ -919,7 +919,7 @@ def main() -> int:
             }
         )
         (tables / "language_normalized_stability.tex").write_text(
-            latex_table_wide(
+            latex_table(
                 stability_table,
                 "Most stable language-normalized evidence sources across Python, Java, and JavaScript target languages.",
                 "tab:language-normalized-stability",
@@ -1115,8 +1115,29 @@ def main() -> int:
         (tables / "llm_external_calibration.tex").write_text(
             latex_table(
                 llm_table,
-                "Per-model confidence and calibration results when the HumanEval-X-trained static verifier is evaluated on external Python-to-Java LLM translations.",
+                "Per-model confidence and calibration results when the Python-to-Java-trained static verifier is evaluated on external source-to-Java LLM translations.",
                 "tab:llm-calibration",
+            ),
+            encoding="utf-8",
+        )
+    if (llm_dir / "llm_source_language_calibration.csv").exists():
+        source_frame = pd.read_csv(llm_dir / "llm_source_language_calibration.csv")
+        source_table = source_frame[
+            ["source_language", "rows", "empirical_accuracy", "mean_confidence", "roc_auc"]
+        ].rename(
+            columns={
+                "source_language": "Source",
+                "rows": "Rows",
+                "empirical_accuracy": "Acc.",
+                "mean_confidence": "Conf.",
+                "roc_auc": "AUC",
+            }
+        )
+        (tables / "llm_source_language_calibration.tex").write_text(
+            latex_table(
+                source_table,
+                "Source-language breakdown for external source-to-Java LLM translations after training the static verifier only on HumanEval-X Python-to-Java pairs.",
+                "tab:llm-source-calibration",
             ),
             encoding="utf-8",
         )
@@ -1136,7 +1157,7 @@ def main() -> int:
         (tables / "llm_confidence_by_score.tex").write_text(
             latex_table(
                 score_table,
-                "Mean EviCode confidence for each graded outcome in the external Python-to-Java LLM prediction dataset.",
+                "Mean EviCode confidence for each graded outcome in the external source-to-Java LLM prediction dataset.",
                 "tab:llm-score-confidence",
             ),
             encoding="utf-8",
@@ -1162,6 +1183,27 @@ def main() -> int:
         plt.tight_layout()
         plt.savefig(figures / "llm_confidence_by_score.pdf")
         plt.close()
+
+    external_dir = ROOT / "results" / "external_validation"
+    if (external_dir / "external_validation_summary.csv").exists():
+        external = pd.read_csv(external_dir / "external_validation_summary.csv")
+        external_table = external[["dataset", "rows", "f1", "roc_auc", "mean_confidence"]].rename(
+            columns={
+                "dataset": "Dataset",
+                "rows": "Rows",
+                "f1": "F1",
+                "roc_auc": "AUC",
+                "mean_confidence": "Conf.",
+            }
+        )
+        (tables / "external_validation_summary.tex").write_text(
+            latex_table(
+                external_table,
+                "External aligned-pair validation using public translation corpora; positives are aligned pairs and negatives are deterministic task mismatches.",
+                "tab:external-validation",
+            ),
+            encoding="utf-8",
+        )
 
     plt.figure(figsize=(7.0, 4.0))
     ax = plt.gca()

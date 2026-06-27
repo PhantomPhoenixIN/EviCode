@@ -1,4 +1,4 @@
-"""Evaluate EviCode confidence on real LLM-generated Python-to-Java translations."""
+"""Evaluate EviCode confidence on real LLM-generated source-to-Java translations."""
 
 from __future__ import annotations
 
@@ -36,6 +36,22 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--predictions-dir", required=True, help="Directory containing LLM JSONL files.")
     parser.add_argument("--train-evidence", required=True, help="HumanEval-X rich evidence JSONL.")
     parser.add_argument("--max-rows", type=int, default=0, help="Optional cap for debugging; 0 means all rows.")
+    parser.add_argument(
+        "--source-languages",
+        default="all",
+        help="Comma-separated source languages to evaluate, or 'all' for every source language targeting Java.",
+    )
+    parser.add_argument("--target-language", default="Java", help="Target language to evaluate.")
+    parser.add_argument(
+        "--train-source-languages",
+        default="all",
+        help="Comma-separated HumanEval-X source languages for verifier training, or 'all'.",
+    )
+    parser.add_argument(
+        "--train-target-languages",
+        default="all",
+        help="Comma-separated HumanEval-X target languages for verifier training, or 'all'.",
+    )
     return add_common_args(parser).parse_args()
 
 
@@ -58,9 +74,28 @@ def candidate_code(row: dict, model_name: str) -> str | None:
     return row.get(clean_key) or row.get("translated_java_code") or row.get(raw_key)
 
 
-def read_external_rows(predictions_dir: Path, max_rows: int) -> list[dict]:
+def normalize_language(language: str | None) -> str:
+    """Normalize language labels for feature extraction and grouping."""
+    aliases = {
+        "c++": "cpp",
+        "c#": "csharp",
+        "javascript": "js",
+    }
+    value = (language or "").strip().lower()
+    return aliases.get(value, value)
+
+
+def selected_source_languages(raw: str) -> set[str] | None:
+    """Return selected normalized source languages, or None for all."""
+    if raw.strip().lower() == "all":
+        return None
+    return {normalize_language(item) for item in raw.split(",") if item.strip()}
+
+
+def read_external_rows(predictions_dir: Path, max_rows: int, source_languages: set[str] | None, target_language: str) -> list[dict]:
     """Read and normalize external LLM prediction rows."""
     rows = []
+    normalized_target = normalize_language(target_language)
     for path in sorted(predictions_dir.glob("*.jsonl")):
         model_name = model_name_from_path(path)
         with path.open("r", encoding="utf-8") as handle:
@@ -68,7 +103,11 @@ def read_external_rows(predictions_dir: Path, max_rows: int) -> list[dict]:
                 if not line.strip():
                     continue
                 raw = json.loads(line)
-                if raw.get("input_language") != "Python" or raw.get("output_language") != "Java":
+                source_language = normalize_language(raw.get("input_language"))
+                row_target_language = normalize_language(raw.get("output_language"))
+                if row_target_language != normalized_target:
+                    continue
+                if source_languages is not None and source_language not in source_languages:
                     continue
                 code = candidate_code(raw, model_name)
                 if not code:
@@ -80,8 +119,8 @@ def read_external_rows(predictions_dir: Path, max_rows: int) -> list[dict]:
                         "problem_id": raw.get("problem_id"),
                         "model_name": model_name,
                         "split": raw.get("split"),
-                        "source_language": "python",
-                        "target_language": "java",
+                        "source_language": source_language,
+                        "target_language": row_target_language,
                         "source_code": raw.get("source_code") or "",
                         "target_code": code,
                         "score": score,
@@ -149,17 +188,30 @@ def main() -> int:
     output_dir.mkdir(parents=True, exist_ok=True)
     mark_stage(output_dir, "evaluate_llm_predictions", "started", {})
 
-    external_rows = read_external_rows(Path(args.predictions_dir), args.max_rows)
+    external_rows = read_external_rows(
+        Path(args.predictions_dir),
+        args.max_rows,
+        selected_source_languages(args.source_languages),
+        args.target_language,
+    )
     if not external_rows:
-        raise ValueError("No Python-to-Java LLM prediction rows found.")
+        raise ValueError("No matching source-to-target LLM prediction rows found.")
     evidence_rows = []
     for row in external_rows:
-        features = static_features(row["source_code"], row["target_code"], "python", "java")
+        features = static_features(row["source_code"], row["target_code"], row["source_language"], row["target_language"])
         evidence_rows.append({**{k: row[k] for k in row if k not in {"source_code", "target_code"}}, **features})
     external = pd.DataFrame(evidence_rows)
     external.to_json(output_dir / "llm_prediction_evidence.jsonl", orient="records", lines=True)
 
     train = pd.DataFrame(read_jsonl(Path(args.train_evidence)))
+    train_source_languages = selected_source_languages(args.train_source_languages)
+    train_target_languages = selected_source_languages(args.train_target_languages)
+    if train_source_languages is not None:
+        train = train[train["source_language"].map(normalize_language).isin(train_source_languages)]
+    if train_target_languages is not None:
+        train = train[train["target_language"].map(normalize_language).isin(train_target_languages)]
+    if train.empty:
+        raise ValueError("No HumanEval-X training rows remain after language filtering.")
     model = make_pipeline(
         StandardScaler(),
         LogisticRegression(max_iter=1000, random_state=config["project"]["seed"]),
@@ -195,6 +247,28 @@ def main() -> int:
     by_model_frame = pd.DataFrame(by_model)
     by_model_frame.to_csv(output_dir / "llm_model_calibration.csv", index=False)
 
+    by_source = []
+    for source_language, group in external.groupby("source_language"):
+        y = group["label"].to_numpy(dtype=int)
+        p = group["verification_confidence"].to_numpy()
+        pred = group["prediction"].to_numpy(dtype=int)
+        by_source.append(
+            {
+                "source_language": source_language,
+                "target_language": str(group["target_language"].iloc[0]),
+                "rows": int(len(group)),
+                "correct": int(y.sum()),
+                "accuracy_at_0_5": accuracy_score(y, pred),
+                "f1": f1_score(y, pred, zero_division=0),
+                "roc_auc": roc_auc_score(y, p) if len(set(y)) > 1 else float("nan"),
+                "brier": brier_score_loss(y, p),
+                "mean_confidence": float(p.mean()),
+                "empirical_accuracy": float(y.mean()),
+            }
+        )
+    by_source_frame = pd.DataFrame(by_source).sort_values(["target_language", "source_language"])
+    by_source_frame.to_csv(output_dir / "llm_source_language_calibration.csv", index=False)
+
     by_score = (
         external.groupby(["score", "failure_grade"])
         .agg(rows=("label", "size"), mean_confidence=("verification_confidence", "mean"), empirical_accuracy=("label", "mean"))
@@ -213,9 +287,14 @@ def main() -> int:
         "ece": expected_calibration_error(bins, len(external)),
         "mean_confidence": float(probabilities.mean()),
         "models": sorted(external["model_name"].unique()),
+        "source_languages": sorted(external["source_language"].unique()),
+        "target_languages": sorted(external["target_language"].unique()),
         "score_counts": {str(k): int(v) for k, v in external["score"].value_counts().sort_index().items()},
         "training_source": str(args.train_evidence),
-        "evaluation_note": "Static verifier trained on HumanEval-X synthetic pairs and evaluated on real Python-to-Java LLM translations.",
+        "training_rows": int(len(train)),
+        "training_source_languages": sorted(train["source_language"].map(normalize_language).unique()),
+        "training_target_languages": sorted(train["target_language"].map(normalize_language).unique()),
+        "evaluation_note": "Static verifier trained on HumanEval-X synthetic pairs and evaluated on real source-to-Java LLM translations.",
     }
     write_json(summary_path, summary)
     mark_stage(output_dir, "evaluate_llm_predictions", "completed", summary)

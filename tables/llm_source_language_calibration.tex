@@ -1,0 +1,21 @@
+\begin{table}[!htbp]
+\centering
+\scriptsize
+\begin{tabular}{lrrrr}
+\toprule
+Source & Rows & Acc. & Conf. & AUC \\
+\midrule
+c & 6662 & 0.205 & 0.064 & 0.309 \\
+cpp & 6962 & 0.223 & 0.056 & 0.307 \\
+csharp & 5819 & 0.132 & 0.090 & 0.427 \\
+haxe & 105 & 0.343 & 0.131 & 0.329 \\
+kotlin & 3641 & 0.195 & 0.082 & 0.338 \\
+python & 7312 & 0.191 & 0.167 & 0.695 \\
+ruby & 5852 & 0.156 & 0.029 & 0.365 \\
+swift & 1297 & 0.357 & 0.092 & 0.361 \\
+\bottomrule
+\end{tabular}
+\vspace{0.5em}
+\caption{Source-language breakdown for external source-to-Java LLM translations after training the static verifier only on HumanEval-X Python-to-Java pairs.}
+\label{tab:llm-source-calibration}
+\end{table}
