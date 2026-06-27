@@ -1151,6 +1151,34 @@ def main() -> int:
         plt.tight_layout()
         plt.savefig(figures / "failure_detection_matrix.pdf")
         plt.close()
+        coverage = failure_matrix[
+            ["failure_type", "count", "syntax_coverage", "api_coverage", "data_flow_coverage", "execution_coverage"]
+        ].copy()
+        coverage = coverage.sort_values("count", ascending=True).tail(8)
+        detector_cols = ["syntax_coverage", "api_coverage", "data_flow_coverage", "execution_coverage"]
+        for col in detector_cols:
+            coverage[col] = coverage[col] * coverage["count"]
+        coverage = coverage.rename(
+            columns={
+                "failure_type": "Failure type",
+                "syntax_coverage": "Syntax",
+                "api_coverage": "API",
+                "data_flow_coverage": "Data flow",
+                "execution_coverage": "Execution",
+            }
+        )
+        ax = coverage.set_index("Failure type")[["Syntax", "API", "Data flow", "Execution"]].plot(
+            kind="barh",
+            stacked=True,
+            figsize=(7.2, 4.2),
+            color=["#4C78A8", "#F58518", "#54A24B", "#B279A2"],
+        )
+        ax.set_xlabel("Detector-weighted failure coverage")
+        ax.set_ylabel("")
+        ax.legend(loc="lower right", fontsize=8)
+        plt.tight_layout()
+        plt.savefig(figures / "failure_coverage_stacked.pdf")
+        plt.close()
 
     if (phase2_dir / "cost_information_pareto.csv").exists():
         pareto = pd.read_csv(phase2_dir / "cost_information_pareto.csv")
