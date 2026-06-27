@@ -46,6 +46,14 @@ DISPLAY_NAMES = {
     "normalized_identifier_only": "NormIdent",
     "normalized_dataflow_only": "NormDF",
     "normalized_call_only": "NormCall",
+    "family_structural_only": "Structural",
+    "family_behavioral_only": "Behavioral",
+    "family_complexity_only": "Complexity",
+    "family_reliability_only": "Reliability",
+    "static_without_structural_family": "-Structural",
+    "static_without_behavioral_family": "-Behavioral",
+    "static_without_complexity_family": "-Complexity",
+    "static_without_reliability_family": "-Reliability",
     "dynamic_only": "Dynamic",
 }
 
@@ -882,6 +890,42 @@ def main() -> int:
         plt.tight_layout()
         plt.savefig(figures / "information_gain_hierarchy.pdf")
         plt.close()
+
+    if (phase2_dir / "family_ablation.csv").exists():
+        family = pd.read_csv(phase2_dir / "family_ablation.csv")
+        family_table = family[["family", "setting", "num_features", "f1", "roc_auc"]].rename(
+            columns={"family": "Family", "setting": "Setting", "num_features": "Feat.", "f1": "F1", "roc_auc": "AUC"}
+        )
+        (tables / "family_ablation.tex").write_text(
+            latex_table(
+                family_table,
+                "Evidence-family ablation results for structural, behavioral, complexity, and reliability evidence.",
+                "tab:family-ablation",
+            ),
+            encoding="utf-8",
+        )
+
+    if (phase2_dir / "language_normalized_stability.csv").exists():
+        stability = pd.read_csv(phase2_dir / "language_normalized_stability.csv")
+        stability_table = stability.head(10)[
+            ["evidence_source", "family", "mean", "std_across_languages", "range_across_languages"]
+        ].rename(
+            columns={
+                "evidence_source": "Evidence",
+                "family": "Family",
+                "mean": "Mean",
+                "std_across_languages": "Lang. Std.",
+                "range_across_languages": "Lang. Range",
+            }
+        )
+        (tables / "language_normalized_stability.tex").write_text(
+            latex_table_wide(
+                stability_table,
+                "Most stable language-normalized evidence sources across Python, Java, and JavaScript target languages.",
+                "tab:language-normalized-stability",
+            ),
+            encoding="utf-8",
+        )
 
     if (phase2_dir / "feature_importance.csv").exists():
         importance = pd.read_csv(phase2_dir / "feature_importance.csv")

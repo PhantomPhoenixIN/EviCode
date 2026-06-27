@@ -26,7 +26,7 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 from evicode.io import read_jsonl  # noqa: E402
-from evicode.taxonomy import feature_to_category, feature_to_name  # noqa: E402
+from evicode.taxonomy import feature_to_category, feature_to_family, feature_to_name  # noqa: E402
 from evicode.utils.cli import add_common_args  # noqa: E402
 from evicode.utils.progress import mark_stage, write_json  # noqa: E402
 
@@ -205,6 +205,7 @@ def main() -> int:
     frame = evidence.merge(examples[["example_id", "source_code", "target_code"]], on="example_id")
     y = frame["label"].astype(int)
     categories = feature_to_category()
+    families = feature_to_family()
     features = [feature for feature in categories if feature in frame.columns]
 
     metric_frame = frame[["example_id", "label", "source_code", "target_code"]].copy()
@@ -268,6 +269,41 @@ def main() -> int:
     importance = model_importance(frame, features, config)
     importance.to_csv(output_dir / "feature_importance.csv", index=False)
 
+    family_rows = []
+    static_features = [feature for feature in features if categories[feature] != "Dynamic"]
+    for family in sorted(set(families.values())):
+        family_features = [
+            feature for feature in static_features if families.get(feature) == family
+        ]
+        if not family_features:
+            continue
+        y_test, prob, _ = grouped_scores(frame, family_features, config)
+        pred = (prob >= 0.5).astype(int)
+        family_rows.append(
+            {
+                "system": f"{family.lower()}_family_only",
+                "family": family,
+                "setting": "only",
+                "num_features": len(family_features),
+                "f1": f1_score(y_test, pred, zero_division=0),
+                "roc_auc": roc_auc_score(y_test, prob),
+            }
+        )
+        remaining = [feature for feature in static_features if families.get(feature) != family]
+        y_test, prob, _ = grouped_scores(frame, remaining, config)
+        pred = (prob >= 0.5).astype(int)
+        family_rows.append(
+            {
+                "system": f"static_without_{family.lower()}",
+                "family": family,
+                "setting": "removed",
+                "num_features": len(remaining),
+                "f1": f1_score(y_test, pred, zero_division=0),
+                "roc_auc": roc_auc_score(y_test, prob),
+            }
+        )
+    pd.DataFrame(family_rows).to_csv(output_dir / "family_ablation.csv", index=False)
+
     language_rows = []
     for language, subset in frame.groupby("target_language"):
         subset_y = subset["label"].astype(int)
@@ -289,6 +325,27 @@ def main() -> int:
                 }
             )
     pd.DataFrame(language_rows).to_csv(output_dir / "language_specific_importance.csv", index=False)
+
+    stability_rows = []
+    normalized_features = [
+        feature for feature in features if categories[feature].startswith("Normalized")
+    ]
+    for feature in normalized_features:
+        by_lang = frame.groupby("target_language")[feature].mean()
+        stability_rows.append(
+            {
+                "feature": feature,
+                "evidence_source": feature_to_name().get(feature, feature),
+                "family": families.get(feature, "Unknown"),
+                "mean": float(frame[feature].mean()),
+                "std_across_languages": float(by_lang.std(ddof=0)),
+                "range_across_languages": float(by_lang.max() - by_lang.min()),
+            }
+        )
+    pd.DataFrame(stability_rows).sort_values("std_across_languages").to_csv(
+        output_dir / "language_normalized_stability.csv",
+        index=False,
+    )
 
     failures = pd.read_json(ROOT / "results" / "failure_analysis" / "failure_cases.jsonl", lines=True)
     failure_evidence = failures.merge(frame, on=["example_id", "problem_id", "source_language", "target_language", "negative_type"])

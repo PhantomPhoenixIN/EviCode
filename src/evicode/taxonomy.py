@@ -218,3 +218,30 @@ def feature_to_category() -> dict[str, str]:
 def feature_to_name() -> dict[str, str]:
     """Map feature names to display names."""
     return {source.feature: source.name for source in EVIDENCE_SOURCES}
+
+
+def evidence_family(feature: str, category: str) -> str:
+    """Return the higher-level evidence family for a feature."""
+    if category == "Dynamic" or "syntax" in feature or "valid" in feature:
+        return "Reliability"
+    if "complexity" in feature or "density" in feature or "depth" in feature or "branching_factor" in feature:
+        return "Complexity"
+    if (
+        "operator" in feature
+        or "return" in feature
+        or "exception" in feature
+        or "call" in feature
+        or "identifier" in feature
+        or "data_flow" in feature
+        or "def_use" in feature
+        or "read_write" in feature
+        or "api" in feature
+        or "type" in feature
+    ):
+        return "Behavioral"
+    return "Structural"
+
+
+def feature_to_family() -> dict[str, str]:
+    """Map feature names to high-level evidence families."""
+    return {source.feature: evidence_family(source.feature, source.category) for source in EVIDENCE_SOURCES}

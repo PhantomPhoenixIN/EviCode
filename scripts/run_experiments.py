@@ -21,17 +21,24 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 from evicode.io import read_jsonl  # noqa: E402
-from evicode.taxonomy import feature_to_category  # noqa: E402
+from evicode.taxonomy import feature_to_category, feature_to_family  # noqa: E402
 from evicode.utils.cli import add_common_args  # noqa: E402
 from evicode.utils.progress import mark_stage, write_json  # noqa: E402
 
 
 CATEGORIES = feature_to_category()
+FAMILIES = feature_to_family()
 STATIC_FEATURES = [feature for feature, category in CATEGORIES.items() if category != "Dynamic"]
 LANGUAGE_NORMALIZED_FEATURES = [
     feature for feature, category in CATEGORIES.items() if category.startswith("Normalized")
 ]
 WEAK_PROXY_FEATURES = [feature for feature, category in CATEGORIES.items() if category == "Weak-proxy"]
+STATIC_FAMILY_FEATURES = {
+    family.lower(): [
+        feature for feature, mapped_family in FAMILIES.items() if mapped_family == family and CATEGORIES[feature] != "Dynamic"
+    ]
+    for family in sorted(set(FAMILIES.values()))
+}
 
 CATEGORY_FEATURES = {
     category.lower().replace("-", "_"): [
@@ -66,6 +73,22 @@ FEATURE_SETS = {
     "normalized_identifier_only": cat("normalized_identifier"),
     "normalized_dataflow_only": cat("normalized_dataflow"),
     "normalized_call_only": cat("normalized_call"),
+    "family_structural_only": STATIC_FAMILY_FEATURES.get("structural", []),
+    "family_behavioral_only": STATIC_FAMILY_FEATURES.get("behavioral", []),
+    "family_complexity_only": STATIC_FAMILY_FEATURES.get("complexity", []),
+    "family_reliability_only": STATIC_FAMILY_FEATURES.get("reliability", []),
+    "static_without_structural_family": [
+        feature for feature in STATIC_FEATURES if FAMILIES.get(feature) != "Structural"
+    ],
+    "static_without_behavioral_family": [
+        feature for feature in STATIC_FEATURES if FAMILIES.get(feature) != "Behavioral"
+    ],
+    "static_without_complexity_family": [
+        feature for feature in STATIC_FEATURES if FAMILIES.get(feature) != "Complexity"
+    ],
+    "static_without_reliability_family": [
+        feature for feature in STATIC_FEATURES if FAMILIES.get(feature) != "Reliability"
+    ],
     "execution_example_only": ["execution_passed_example"],
     "execution_full_only": ["execution_passed_full"],
     "dynamic_only": ["execution_passed_example", "execution_passed_full"],

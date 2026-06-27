@@ -10,6 +10,15 @@ The current setting is **reference-free with respect to target-language gold imp
 
 ## Evidence Classification
 
+EviCode now reports evidence through four high-level families:
+
+| Family | What It Measures | Examples |
+|---|---|---|
+| Structural | Program organization independent of syntax | loops, branches, nesting, CFG-size proxies, statement distribution, function/class structure |
+| Behavioral | Operations and value movement | operator families, returns, exceptions, calls, identifier roles, variable usage, data-flow summaries |
+| Complexity | Density and decision structure | cyclomatic complexity, decision density, expression density, assignment density, tree depth |
+| Reliability | Whether evidence can be trusted or behavior was observed | parse validity, syntax validity, execution availability, execution pass/fail, confidence estimates |
+
 | Evidence | Feature | Classification | Interpretation |
 |---|---|---|---|
 | Token overlap | `token_jaccard` | Weak cross-language proxy | Useful for cheap plausibility but sensitive to syntax and naming. |

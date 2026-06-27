@@ -66,7 +66,7 @@ A Java candidate with \texttt{return a - b;} shares identifiers, syntax, express
 
 EviCode, short for Evidence for Code, treats verification as an empirical study of evidence rather than another monolithic score. It separates evidence extraction from evidence fusion. Each evidence source produces an observation about a source-target program pair. A transparent fusion model is used only as an analysis instrument for combining those observations into a confidence score. The scientific contribution is the decomposition: it lets us ask which non-execution signals are worth keeping, which sources are complementary, which are redundant, how much execution changes the decision, and whether confidence is calibrated on external LLM translations.
 
-This paper makes four contributions. First, it formalizes semantic verification as evidence extraction, hierarchy, cost, complementarity, and calibration rather than as a search for a single best metric. Second, it implements a reproducible evidence taxonomy spanning lexical, syntactic, structural, API, identifier, data-flow, type, retrieval, and execution evidence. Third, it quantifies the semantic information carried by each category of static evidence, showing which signals are useful for ranking, diagnosis, and failure explanation even when they cannot certify correctness. Fourth, it evaluates evidence-fused confidence on real Python-to-Java translations from DeepSeekCoder, QwenCoder, and StarCoder, showing that calibrated verification scores can support triage without pretending to replace execution.
+This paper makes four contributions. First, it formalizes translated-code verification as evidence-based semantic verification: given a source program and a translated candidate, the verifier estimates what evidence supports semantic equivalence without requiring a target-language reference during inference. Second, it implements a reproducible language-normalized evidence taxonomy organized into structural, behavioral, complexity, and reliability families. Third, it quantifies the semantic information, complementarity, redundancy, cost, calibration, and cross-language stability of those evidence families. Fourth, it evaluates evidence-fused confidence on real Python-to-Java translations from DeepSeekCoder, QwenCoder, and StarCoder, showing that calibrated source-candidate verification scores can support triage without pretending to replace execution.
 
 The novelty is not the use of a particular classifier or the observation that execution is valuable. A practitioner could compute many features and train a logistic model, but that alone would not answer the scientific questions studied here: which evidence sources carry semantic information, which are complementary or redundant, how evidence changes under execution constraints, and which design principles follow for future verification metrics. EviCode therefore treats feature fusion as an instrument for evidence measurement, not as the contribution itself.
 
@@ -262,6 +262,8 @@ where $c$ denotes control-flow statistics, $s$ structural statistics, $o$ operat
 \]
 and histogram properties are compared by cosine similarity. This means Python and Java programs are not compared by raw AST node labels. They are first mapped into comparable evidence profiles and then compared. Execution remains separate because it observes behavior on sampled inputs.
 
+The resulting taxonomy has four high-level families. \textbf{Structural evidence} measures loop structure, branch structure, nesting, function decomposition, CFG-size proxies, and statement distributions. \textbf{Behavioral evidence} measures operator usage, return and exception behavior, call patterns, identifier-role distributions, variable-use summaries, and approximate data flow. \textbf{Complexity evidence} measures cyclomatic complexity, decision density, expression density, assignment density, call density, and tree-depth properties. \textbf{Reliability evidence} measures parse success, syntax validity, execution availability, execution pass/fail outcomes, and calibrated confidence. The central hypothesis is that semantic equivalence between programs written in different languages can be estimated by aggregating complementary language-normalized evidence from these families, while recognizing that static evidence supports triage rather than proof.
+
 \subsection{Lexical Evidence}
 Lexical evidence measures token overlap, edit similarity, and length ratio. It is historically important because early code-generation evaluation borrowed text metrics from machine translation: if a generated program uses many of the same tokens as the source or reference, it often reflects related intent. In cross-language translation, however, lexical evidence is only a weak proxy. Python and Java differ in declarations, punctuation, types, and library idioms, so raw overlap cannot be treated as semantic evidence. EviCode keeps these features for cheap triage and as baselines, but de-emphasizes them in the scientific interpretation.
 
@@ -305,7 +307,7 @@ The limitation is not that execution is a weak idea. The limitation is that exec
 The taxonomy leads to a central expectation tested later in the paper. Evidence sources closer to behavior should generally be more reliable for final correctness, while cheaper static evidence should be most useful for ranking, diagnosis, and explanation. The experiments evaluate this expectation rather than assuming it.
 
 \section{Research Questions}
-EviCode asks six research questions.
+EviCode asks seven research questions.
 
 \textbf{RQ1: Informativeness.} Which evidence sources are individually most informative for semantic correctness?
 
@@ -317,7 +319,9 @@ EviCode asks six research questions.
 
 \textbf{RQ5: External validation and calibration.} Does evidence-fused confidence generalize to real Python-to-Java LLM translations, and is that confidence useful for triage?
 
-\textbf{RQ6: Disagreement.} When evidence sources disagree, what do those disagreements reveal about the limits of existing metrics?
+\textbf{RQ6: Language-normalized evidence families.} Which structural, behavioral, complexity, and reliability families are stable, complementary, or redundant across languages?
+
+\textbf{RQ7: Disagreement.} When evidence sources disagree, what do those disagreements reveal about the limits of existing metrics?
 
 \section{Architecture}
 The EviCode pipeline separates evidence extraction from confidence estimation. As shown in Figure~\ref{fig:pipeline}, a generated candidate is not sent directly to a black-box classifier. Instead, specialized extractors produce evidence, the fusion model estimates confidence, and the report names the strongest and weakest sources. This architecture reflects the evidence-centered view of verification: trust decisions should expose the observations behind them.
@@ -652,6 +656,19 @@ The graded LLM labels test whether EviCode confidence captures a quality continu
 \end{keyfindingsbox}
 
 The synthesis from RQ5 is that evidence-fused confidence behaves differently from a binary metric. Under distribution shift, the score is not accurate enough to certify correctness, but it still preserves useful ordering and approximate calibration. This makes the confidence valuable as a triage signal: high-risk candidates can be routed to execution or repair, while higher-confidence candidates can be prioritized without hiding the uncertainty behind a hard label.
+
+\section{Language-Normalized Evidence Family Analysis}
+The language-normalized redesign changes the unit of analysis from individual handcrafted metrics to evidence families. Table~\ref{tab:family-ablation} evaluates the four families directly. Structural evidence captures shape and organization, behavioral evidence captures operations and value movement, complexity evidence captures density and decision structure, and reliability evidence captures validity and execution-related trust signals. The goal of this analysis is not to crown one family as universally best; it is to determine whether the verifier obtains useful signal from coherent evidence families rather than from an arbitrary list of features.
+
+\IfFileExists{../tables/family_ablation.tex}{\input{../tables/family_ablation.tex}}{}
+
+The family ablation results should be read as a design diagnostic. If a family performs well by itself, it contains useful standalone evidence. If removing a family sharply lowers performance, it contributes information that other families do not fully replace. This framing is more scientifically useful than asking whether one feature has the largest coefficient, because semantic equivalence is rarely visible through a single observation. Translated programs may preserve control shape but change an operator, preserve operators but alter data flow, or parse successfully while using the wrong API. Evidence families make those distinctions visible.
+
+Table~\ref{tab:language-normalized-stability} adds a second test: whether normalized features behave consistently across target languages. Stable evidence is not necessarily the most predictive evidence, but it is important for a cross-language verifier because it is less likely to depend on a single grammar or surface convention. Low variation across Python, Java, and JavaScript suggests that a feature is measuring a program property rather than a language artifact. High variation, by contrast, signals that the feature may require language-specific calibration.
+
+\IfFileExists{../tables/language_normalized_stability.tex}{\input{../tables/language_normalized_stability.tex}}{}
+
+The main conclusion from RQ6 is that language-normalized evidence should be evaluated along two axes: contribution and stability. A useful evidence family should either add predictive information, remain stable across languages, or explain a failure mode that other families miss. This is why EviCode reports structural, behavioral, complexity, and reliability evidence separately before fusion. The decomposition makes the verifier easier to audit: a high score based mainly on reliability evidence means something different from a high score supported by behavioral and data-flow consistency.
 
 \section{Metric and Language Analysis}
 Surface metrics fail for a predictable scientific reason: they observe resemblance, not behavior. Table~\ref{tab:metric-comparison} shows that BLEU and CrystalBLEU have very low F1, 0.028 and 0.022, despite moderate AUC values of 0.685 and 0.714. TF-IDF and CodeBLEU are stronger thresholded signals, with F1 0.530 and 0.559 and AUC about 0.727--0.728, but they remain far below execution F1 0.885. EviCode All reaches F1 0.869 and AUC 0.959, showing that fusion is strongest as a confidence-ranking mechanism even when execution remains the strongest thresholded decision signal. This is not a weakness of implementation; it is a limitation of what the metrics can observe. A generated program may preserve many tokens while changing an operator, and a correct translation may replace many tokens because the target language uses different syntax, APIs, or idioms. Overall, Table~\ref{tab:metric-comparison} shows why conventional metrics should be interpreted as evidence sources rather than as semantic judges: they contribute partial observations, but they do not define correctness.

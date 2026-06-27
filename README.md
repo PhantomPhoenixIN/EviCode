@@ -18,6 +18,19 @@ Semantic verification is not a single metric problem. In the evaluated settings:
 - Evidence fusion is most valuable as calibrated confidence and explanation, not as a replacement for execution.
 - The results support an empirical evidence hierarchy: surface plausibility, validity, structure, program obligations, and observed behavior.
 
+## Evidence Families
+
+EviCode now organizes language-normalized evidence into four families:
+
+| Family | Examples | Role |
+|---|---|---|
+| Structural | loops, branches, nesting, CFG-size proxies, statement distribution | captures program organization across languages |
+| Behavioral | operators, returns, exceptions, calls, identifier roles, data-flow summaries | captures operation and value-movement evidence |
+| Complexity | cyclomatic complexity, decision density, expression density, assignment density | captures decision and expression structure |
+| Reliability | parse success, syntax validity, execution availability, confidence | captures whether evidence and behavior can be trusted |
+
+Family ablation shows that the families contribute different kinds of evidence. Behavioral-only evidence reaches F1 `0.389` and AUC `0.711`; structural-only evidence reaches F1 `0.329` and AUC `0.734`; removing reliability evidence has the largest static impact in the current implementation, reducing static F1 to `0.436`.
+
 ## Dataset Snapshot
 
 | Setting | Value |
