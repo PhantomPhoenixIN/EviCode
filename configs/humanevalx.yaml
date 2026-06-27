@@ -1,0 +1,25 @@
+project:
+  name: EviCode
+  seed: 42
+
+dataset:
+  hf_name: THUDM/humaneval-x
+  split: test
+  languages:
+    - python
+    - java
+    - js
+  negative_types:
+    - mismatch
+    - mutation
+
+execution:
+  timeout_seconds: 5
+  budgets:
+    - none
+    - example
+    - full
+
+experiment:
+  test_size: 0.3
+  output_dir: experiments/humanevalx

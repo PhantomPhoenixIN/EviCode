@@ -1,0 +1,10 @@
+{
+  "candidate_code": "...",
+  "execution_result": "pass|fail|timeout|not_run",
+  "label": 0,
+  "model_name": "public-or-local-model",
+  "problem_id": "HumanEval/0",
+  "source_code": "...",
+  "source_language": "python",
+  "target_language": "java"
+}

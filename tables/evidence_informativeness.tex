@@ -1,0 +1,19 @@
+\begin{table}[!htbp]
+\centering
+\small
+\begin{tabular}{llrr}
+\toprule
+Evidence & Category & AUC & MI \\
+\midrule
+Full execution & Dynamic & 0.934 & 0.409 \\
+Example execution & Dynamic & 0.913 & 0.356 \\
+Token overlap & Lexical & 0.739 & 0.109 \\
+AST node similarity & Syntactic & 0.550 & 0.108 \\
+Condition/operator patterns & Structural & 0.633 & 0.069 \\
+Identifier overlap & Semantic-static & 0.709 & 0.059 \\
+\bottomrule
+\end{tabular}
+\vspace{0.5em}
+\caption{Evidence features with the highest individual mutual information with the HumanEval-X correctness label.}
+\label{tab:evidence-informativeness}
+\end{table}

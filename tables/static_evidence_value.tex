@@ -1,0 +1,22 @@
+\begin{table*}[!t]
+\centering
+\small
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lllrrlll}
+\toprule
+Evidence & Category & Primary value & MI & AUC & Cost & Avail. & Design interpretation \\
+\midrule
+Token overlap & Lexical & Surface triage & 0.109 & 0.739 & low & 1.0 & Strong cheap ranking signal, but vulnerable to lexical mimicry. \\
+AST node similarity & Syntactic & Structural alignment & 0.108 & 0.550 & low & 1.0 & Informative in isolation, but weakly separates correct from incorrect candidates. \\
+Condition/operator patterns & Structural & Local computation & 0.069 & 0.633 & low & 1.0 & Behavior-proximal evidence for arithmetic, predicate, and operator errors. \\
+Parse validity & Syntactic & Candidate validity & 0.057 & 0.586 & low & 1.0 & Cheaply removes malformed candidates before deeper verification. \\
+Control flow & Structural & Execution shape & 0.045 & 0.628 & low & 1.0 & Captures branch and loop obligations missed by lexical evidence. \\
+Identifier role consistency & Semantic-static & Value responsibility & 0.018 & 0.640 & low & 1.0 & Useful for explaining role swaps and suspicious data movement. \\
+API mismatch & Semantic-static & Target API misuse & 0.014 & 0.392 & low & 1.0 & Directional diagnostic signal; low values often indicate likely API failure. \\
+\bottomrule
+\end{tabular}
+}
+\vspace{0.5em}
+\caption{Cost-normalized interpretation of non-execution evidence. Because these sources are inexpensive in the current implementation, their scientific value comes from the semantic failure modes they expose rather than from small elapsed-time differences.}
+\label{tab:static-evidence-value}
+\end{table*}

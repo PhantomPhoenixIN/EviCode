@@ -1,0 +1,19 @@
+{
+  "project": "EviCode",
+  "status": "humanevalx_benchmark_plus_external_llm_calibration_complete",
+  "current_milestone": "phase4_top_tier_manuscript_rewrite",
+  "last_updated": "2026-06-25",
+  "notes": [
+    "Python dependencies installed from requirements-dev.txt.",
+    "Synthetic smoke test passes.",
+    "HumanEval-X Python, Java, and JavaScript benchmark built with 2,952 verification examples.",
+    "Evidence extraction, parser-backed static refresh, fusion experiments, statistical validation, tables, figures, and paper build completed.",
+    "Evidence taxonomy, richer static features, informativeness, complementarity, cost, execution-budget status, weak-test status, and failure explanation analyses completed.",
+    "Phase II scientific analyses completed: metric comparison, hierarchy, attribution, language rankings, failure coverage, Pareto analysis, guidelines, self-review, and generated-candidate schema.",
+    "External Python-to-Java LLM prediction dataset evaluated for verification confidence and calibration.",
+    "Phase III manuscript rewrite completed with reviewer report, running example, formal evidence model, expanded related work, evidence-source explanations, and threats to validity.",
+    "Phase IV manuscript rewrite completed with five independent reviewer critiques, stronger five-act motivation, multiple running examples, richer mathematical framing, expanded bibliography, deeper evidence explanations, and an interpretation-centered discussion.",
+    "Narrative sharpening pass completed with a new empirical-study title, conceptual evidence-ladder figure, surprising-findings table, qualitative disagreement table, expanded metric/discussion interpretation, and stronger conclusion.",
+    "Verification reports include evidence-grounded explanations."
+  ]
+}

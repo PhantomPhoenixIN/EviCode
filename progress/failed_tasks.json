@@ -1,0 +1,9 @@
+{
+  "failed": [
+    {
+      "task": "system_jdk_winget_install",
+      "date": "2026-06-25",
+      "reason": "Temurin JDK winget MSI timed out; replaced with project-local portable JDK 17."
+    }
+  ]
+}

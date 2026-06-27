@@ -1,0 +1,89 @@
+{
+  "completed": [
+    {
+      "task": "initial_machine_audit",
+      "date": "2026-06-25",
+      "summary": "Inspected OS, CPU, RAM, GPU, disk, Python, Git, Node.js, Java, and compilers."
+    },
+    {
+      "task": "initial_repository_scaffold",
+      "date": "2026-06-25",
+      "summary": "Created EviCode directory structure and reproducibility skeleton."
+    },
+    {
+      "task": "toolchain_bootstrap",
+      "date": "2026-06-25",
+      "summary": "Installed Python, Git, Node.js, MiKTeX, and project-local JDK 17."
+    },
+    {
+      "task": "smoke_pipeline",
+      "date": "2026-06-25",
+      "summary": "Ran unit tests, synthetic smoke pipeline, verification report generation, and paper build."
+    },
+    {
+      "task": "evidence_explanation_scaffold",
+      "date": "2026-06-25",
+      "summary": "Added VerificationReport and reframed the paper around evidence contribution and explanation."
+    },
+    {
+      "task": "humanevalx_dataset",
+      "date": "2026-06-25",
+      "summary": "Built 2,952 directed HumanEval-X verification examples across Python, Java, and JavaScript."
+    },
+    {
+      "task": "humanevalx_evidence_extraction",
+      "date": "2026-06-25",
+      "summary": "Extracted static and execution evidence, then refreshed static evidence with tree-sitter parsers."
+    },
+    {
+      "task": "humanevalx_fusion_and_statistics",
+      "date": "2026-06-25",
+      "summary": "Ran grouped evidence-fusion experiments, bootstrap F1 intervals, and exact McNemar comparisons."
+    },
+    {
+      "task": "paper_artifacts",
+      "date": "2026-06-25",
+      "summary": "Generated benchmark tables, figures, and paper/output/paper.pdf from the single-file manuscript."
+    },
+    {
+      "task": "evidence_study_refocus",
+      "date": "2026-06-25",
+      "summary": "Refocused EviCode around evidence taxonomy, informativeness, complementarity, cost, budget status, and failure explanations."
+    },
+    {
+      "task": "rich_static_evidence",
+      "date": "2026-06-25",
+      "summary": "Added token, edit, AST shape, control-flow, operator, API/call, identifier-role, data-flow, and type evidence features."
+    },
+    {
+      "task": "analysis_artifacts",
+      "date": "2026-06-25",
+      "summary": "Generated analysis CSV/JSON outputs plus paper tables and figures for evidence-study research questions."
+    },
+    {
+      "task": "phase2_scientific_analysis",
+      "date": "2026-06-25",
+      "summary": "Added metric comparison, evidence hierarchy, attribution, language analysis, failure detection coverage, Pareto analysis, guidelines, and self-review outputs."
+    },
+    {
+      "task": "llm_prediction_calibration",
+      "date": "2026-06-25",
+      "summary": "Evaluated 7,312 Python-to-Java LLM translations from DeepSeekCoder, QwenCoder, and StarCoder for continuous verification confidence and calibration."
+    },
+    {
+      "task": "phase3_manuscript_rewrite",
+      "date": "2026-06-25",
+      "summary": "Created five-reviewer critique and rewrote the single-file manuscript around semantic verification, evidence formalization, running examples, expanded related work, interpretation, and threats to validity."
+    },
+    {
+      "task": "phase4_top_tier_manuscript_rewrite",
+      "date": "2026-06-25",
+      "summary": "Created the Phase IV five-reviewer report, rewrote the manuscript around verification motivation, metric evidence history, execution availability, richer examples, expanded formal definitions, stronger evidence-source explanations, and a deeper discussion; rebuilt paper/output/paper.pdf."
+    },
+    {
+      "task": "narrative_disagreement_revision",
+      "date": "2026-06-25",
+      "summary": "Added conceptual evidence-ladder figure, interpretive surprising-findings table, qualitative disagreement cases, expanded discussion of why metrics behave as observed, revised title, and strengthened conclusion."
+    }
+  ]
+}

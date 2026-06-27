@@ -1,0 +1,14 @@
+{
+  "expected_schema": {
+    "candidate_code": "...",
+    "execution_result": "pass|fail|timeout|not_run",
+    "label": 0,
+    "model_name": "public-or-local-model",
+    "problem_id": "HumanEval/0",
+    "source_code": "...",
+    "source_language": "python",
+    "target_language": "java"
+  },
+  "reason": "External Python-to-Java LLM prediction files were added under datasets/Predictions_by_LLMs and evaluated with the static EviCode confidence model.",
+  "status": "completed_python_to_java_external_llm_predictions"
+}

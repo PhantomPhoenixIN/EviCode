@@ -1,0 +1,21 @@
+\begin{table}[!htbp]
+\centering
+\small
+\begin{tabular}{lrr}
+\toprule
+Combination & F1 & AUC \\
+\midrule
+static\_plus\_full\_execution & 0.889 & 0.957 \\
+static\_plus\_example\_execution & 0.873 & 0.934 \\
+semantic\_static\_plus\_syntactic & 0.471 & 0.802 \\
+lexical\_plus\_syntactic & 0.460 & 0.806 \\
+structural\_plus\_syntactic & 0.415 & 0.701 \\
+lexical\_plus\_structural & 0.393 & 0.717 \\
+semantic\_static\_plus\_structural & 0.360 & 0.707 \\
+lexical\_plus\_semantic\_static & 0.356 & 0.731 \\
+\bottomrule
+\end{tabular}
+\vspace{0.5em}
+\caption{Best pairwise and fused evidence-group combinations on HumanEval-X, used to identify complementary sources beyond single evidence families.}
+\label{tab:evidence-complementarity}
+\end{table}

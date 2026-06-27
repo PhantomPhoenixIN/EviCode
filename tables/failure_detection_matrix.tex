@@ -1,0 +1,21 @@
+\begin{table}[!htbp]
+\centering
+\small
+\begin{tabular}{lrrrr}
+\toprule
+Failure & Syn. & API & DF & Exec. \\
+\midrule
+API mismatch & 0.000 & 1.000 & 0.783 & 0.875 \\
+control-flow mismatch & 0.000 & 0.000 & 0.387 & 0.484 \\
+data-flow mismatch & 0.000 & 0.000 & 1.000 & 0.534 \\
+execution-only failure & 0.000 & 0.000 & 0.000 & 1.000 \\
+identifier mismatch & 0.000 & 0.000 & 1.000 & 1.000 \\
+insufficient evidence & 0.000 & 0.000 & 0.000 & 1.000 \\
+semantic mismatch & 0.000 & 0.000 & 0.000 & 0.488 \\
+syntax failure & 1.000 & 0.829 & 0.723 & 1.000 \\
+\bottomrule
+\end{tabular}
+\vspace{0.5em}
+\caption{Mapping from rule-based failure types to the evidence detectors that can flag each failure mode.}
+\label{tab:failure-detection}
+\end{table}

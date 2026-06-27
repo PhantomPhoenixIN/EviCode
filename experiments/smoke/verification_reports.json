@@ -1,0 +1,30 @@
+[
+  {
+    "likely_failure_modes": [],
+    "pair_id": "p1_pos",
+    "prediction": 1,
+    "score": 0.5003801858880004,
+    "summary": "Overall verdict: likely correct (score=0.500). High-confidence evidence: syntax, ast, control_flow, api, identifier, execution, retrieval. Weak evidence: none."
+  },
+  {
+    "likely_failure_modes": [],
+    "pair_id": "p1_neg",
+    "prediction": 0,
+    "score": 0.4994487382449928,
+    "summary": "Overall verdict: likely incorrect (score=0.499). High-confidence evidence: syntax, ast, control_flow, api, identifier, execution, retrieval. Weak evidence: none."
+  },
+  {
+    "likely_failure_modes": [],
+    "pair_id": "p2_pos",
+    "prediction": 1,
+    "score": 0.5003801858880004,
+    "summary": "Overall verdict: likely correct (score=0.500). High-confidence evidence: syntax, ast, control_flow, api, identifier, execution, retrieval. Weak evidence: none."
+  },
+  {
+    "likely_failure_modes": [],
+    "pair_id": "p2_neg",
+    "prediction": 0,
+    "score": 0.499598971646274,
+    "summary": "Overall verdict: likely incorrect (score=0.500). High-confidence evidence: syntax, ast, control_flow, api, identifier, execution, retrieval. Weak evidence: none."
+  }
+]

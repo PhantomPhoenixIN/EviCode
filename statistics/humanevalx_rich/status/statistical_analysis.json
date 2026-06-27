@@ -1,0 +1,8 @@
+{
+  "details": {
+    "bootstrap_rows": 65,
+    "mcnemar_rows": 9
+  },
+  "stage": "statistical_analysis",
+  "status": "completed"
+}

@@ -1,0 +1,20 @@
+\begin{table}[!htbp]
+\centering
+\small
+\begin{tabular}{lrrl}
+\toprule
+Metric & F1 & AUC & PR-AUC \\
+\midrule
+BLEU & 0.028 & 0.685 & 0.474 \\
+Crystal & 0.022 & 0.714 & 0.495 \\
+CodeBLEU & 0.559 & 0.728 & 0.510 \\
+TF-IDF & 0.530 & 0.727 & 0.496 \\
+Exec. & 0.885 & 0.934 & 0.795 \\
+EviCode All & 0.894 & 0.958 & - \\
+EviCode Static & 0.526 & 0.807 & - \\
+\bottomrule
+\end{tabular}
+\vspace{0.5em}
+\caption{Comparison of lightweight similarity metrics, execution, and explicit EviCode evidence-fusion configurations on the same HumanEval-X verification split.}
+\label{tab:metric-comparison}
+\end{table}

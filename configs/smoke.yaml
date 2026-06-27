@@ -1,0 +1,22 @@
+project:
+  name: EviCode
+  seed: 42
+
+paths:
+  output_dir: experiments/smoke
+
+pipeline:
+  dataset: synthetic_smoke
+  language_pair: python_to_javascript
+  evidence_sources:
+    - syntax
+    - ast
+    - control_flow
+    - api
+    - identifier
+    - execution
+    - retrieval
+
+fusion:
+  model: logistic_regression
+  test_size: 0.5

@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Environments
+.venv/
+venv/
+env/
+.env
+
+# Local tool downloads
+tools/
+
+# Data/model artifacts
+datasets/raw/
+datasets/cache/
+models/*
+!models/.gitkeep
+experiments/*/checkpoints/
+experiments/*/predictions/
+results/*
+!results/.gitkeep
+logs/*
+!logs/.gitkeep
+
+# Generated paper artifacts
+paper/*.aux
+paper/*.bbl
+paper/*.blg
+paper/*.log
+paper/*.out
+paper/*.pdf
+paper/output/
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/

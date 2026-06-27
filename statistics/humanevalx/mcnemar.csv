@@ -1,0 +1,10 @@
+baseline,system,b01,b10,discordant,p_value
+execution_full_only,all_evidence,0,0,0,1.0
+execution_full_only,static_plus_example_execution,3,18,21,0.0014896392822265625
+execution_full_only,static_plus_full_execution,0,0,0,1.0
+execution_example_only,all_evidence,18,3,21,0.0014896392822265625
+execution_example_only,static_plus_example_execution,0,0,0,1.0
+execution_example_only,static_plus_full_execution,18,3,21,0.0014896392822265625
+static_only,all_evidence,234,38,272,1.3006607455830872e-35
+static_only,static_plus_example_execution,225,44,269,1.9267416709405127e-30
+static_only,static_plus_full_execution,234,38,272,1.3006607455830872e-35

@@ -1,0 +1,20 @@
+\begin{table*}[!t]
+\centering
+\small
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{llrrrll}
+\toprule
+Pattern & Example & BLEU & CodeBLEU & AST & Exec. & Reason \\
+\midrule
+High structure, wrong behavior & 157\_js\_to\_java\_mutation & 0.446 & 0.828 & 0.957 & fail & High tree similarity can hide wrong behavior. \\
+High CodeBLEU, execution fail & 75\_js\_to\_java\_mutation & 0.505 & 0.841 & 0.881 & fail & Code-aware similarity cannot observe failing tests. \\
+Low lexical, execution pass & 160\_java\_to\_python\_positive & 0.000 & 0.481 & 0.826 & pass & Correct translations can use different tokens. \\
+Role signal beats raw names & 40\_java\_to\_js\_positive & 0.283 & 0.818 & 0.865 & pass & Role consistency can survive renaming. \\
+Example pass, full fail & 157\_js\_to\_python\_mutation & 0.614 & 0.804 & 0.715 & fail & Partial tests can miss full-suite behavior. \\
+\bottomrule
+\end{tabular}
+}
+\vspace{0.5em}
+\caption{Qualitative disagreement cases illustrating why average metric scores hide important evidence conflicts.}
+\label{tab:qualitative-disagreements}
+\end{table*}

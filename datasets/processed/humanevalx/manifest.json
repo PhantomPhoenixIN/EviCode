@@ -1,0 +1,19 @@
+{
+  "hf_name": "THUDM/humaneval-x",
+  "labels": {
+    "negative": 1968,
+    "positive": 984
+  },
+  "languages": [
+    "python",
+    "java",
+    "js"
+  ],
+  "num_examples": 2952,
+  "num_programs": {
+    "java": 164,
+    "js": 164,
+    "python": 164
+  },
+  "split": "test"
+}

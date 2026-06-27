@@ -1,0 +1,7 @@
+{
+  "best_f1": 0.9036144578313253,
+  "best_system": "all_evidence",
+  "num_examples": 2952,
+  "num_test": 900,
+  "num_train": 2052
+}

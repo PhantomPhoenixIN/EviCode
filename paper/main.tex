@@ -1,0 +1,781 @@
+﻿\documentclass[conference]{IEEEtran}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{placeins}
+
+\graphicspath{{../figures/}{figures/}}
+
+\makeatletter
+\long\def\@makecaption#1#2{%
+  \footnotesize\centering
+  \def\@tempa{table}%
+  \ifx\@captype\@tempa
+    Table~\thetable. #2\par
+  \else
+    Figure~\thefigure. #2\par
+  \fi}
+\makeatother
+
+\newenvironment{keyfindingsbox}[1]{%
+  \par\smallskip
+  \noindent\begin{minipage}{\linewidth}
+  \hrule\smallskip
+  \textbf{Key Findings (#1).}
+  \begin{itemize}
+}{%
+  \end{itemize}
+  \smallskip\hrule
+  \end{minipage}
+  \par\smallskip
+}
+
+\title{EviCode: Understanding Verification Evidence for Machine-Generated Code}
+
+\author{}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Machine-generated code is increasingly used for translation, repair, synthesis, and programming assistance, but every such setting raises the same practical question: should a generated program be trusted? Textual metrics are cheap but can confuse surface similarity with semantic correctness. Execution is a stronger reference, but tests may be missing, incomplete, expensive, or unavailable in the target environment. This paper studies semantic verification as an evidence problem. EviCode, short for Evidence for Code, decomposes verification into explicit evidence sources--lexical, syntactic, structural, API, identifier, data-flow, type, retrieval, and execution evidence--and asks which sources are informative, complementary, cost-effective, and explainable. On 2,952 HumanEval-X Python, Java, and JavaScript verification examples, we quantify the semantic information carried by each evidence category and derive an empirical evidence hierarchy for generated-code verification. In our experiments, full execution provides the strongest single source, but the more important result is the structure of the non-execution signals: token overlap is a strong cheap ranking signal, AST similarity mainly captures structural alignment, operator and control-flow evidence expose local semantic changes, and API and identifier-role evidence provide diagnostic value. On 7,312 external Python-to-Java translations from DeepSeekCoder, QwenCoder, and StarCoder, a static EviCode verifier trained on HumanEval-X obtains ROC-AUC 0.694 and mean confidence 0.180 versus empirical correctness 0.191, showing that evidence-fused probabilities are useful as triage and calibration signals. The main lesson is that explicit evidence decomposition reveals which static signals are worth keeping in the evaluated settings, where each signal fails, and how future verification metrics can be designed more transparently.
+\end{abstract}
+
+\section{Introduction}
+Modern software engineering increasingly depends on code that was not written line by line by the developer who will maintain it. Translation systems port programs from Python to Java, repair systems synthesize patches, completion engines fill in method bodies, migration tools rewrite APIs, and large language models generate candidate implementations inside everyday development environments. These systems differ in training data and interface, but they share a deployment bottleneck: before generated code can be trusted, someone or something must decide whether it preserves the intended behavior.
+
+That decision is semantic, not cosmetic. A generated program can be beautifully formatted and wrong. It can compile and still return the wrong value on a boundary case. It can pass a small test suite and still fail in production. It can also look surprisingly different from the reference and be perfectly correct. Verification is therefore the bridge between code generation as a modeling problem and code generation as a software engineering practice. A generator proposes; a verifier decides whether the proposal is safe enough to route to execution, review, repair, or use.
+
+\textbf{Why verification matters.} The same verification question appears across several tasks. In code translation, the target-language program must preserve source-language behavior. In automated repair, the patch must fix the bug without introducing regressions. In code completion, the inserted code must satisfy the surrounding API and type context. In software migration, generated calls must preserve library semantics. In LLM-based code generation, the candidate must be checked before it becomes part of a larger system. These settings are not served well by a single notion of similarity: a migration candidate may be textually far from the old code because it uses a new API, while a repair candidate may be textually close to the old code precisely because the required behavioral change is small.
+
+\textbf{Why verification is difficult.} The difficulty is easiest to see through small examples. Suppose the intended Python behavior is:
+\begin{verbatim}
+def add(a, b):
+    return a + b
+\end{verbatim}
+A Java candidate with \texttt{return a - b;} shares identifiers, syntax, expression shape, and control structure with the intended program, but it is wrong. A candidate with \texttt{return b + a;} has different token order yet is correct for integer addition. A candidate with \texttt{return Math.plus(a,b);} may express the right intent but fail because the API does not exist. A candidate that special-cases \texttt{if (a==0) return b;} may pass simple tests and fail only when both operands matter. A candidate that calls \texttt{String.valueOf(a) + b} may compile but silently change the output type. Each case fools a different metric. Lexical overlap can miss equivalence; AST similarity can miss operators; compilation can miss behavior; tests can miss untested regions.
+
+\textbf{How metrics evolved.} Evaluation metrics have moved toward semantics by observing progressively richer information. BLEU observes token n-grams and rewards local textual resemblance. CrystalBLEU removes frequent code idioms so boilerplate does not dominate. CodeBLEU adds syntax and data-flow-inspired components because programs are structured artifacts. Execution-based evaluation runs tests and observes behavior. Learned evaluators fuse signals into predictions. This historical progression is reasonable: each stage adds evidence that the previous stage could not see. Yet the community often reports the final scalar score without asking what information produced it.
+
+\textbf{Execution is powerful but not always available.} This paper does not argue that execution is unreliable. In our experiments, execution is the strongest practical approximation to semantic correctness because it observes program behavior under tests. The limitation is availability. Test cases may be missing, weak, hidden, expensive, flaky, or tied to a difficult runtime environment. Generated code may depend on compilers, packages, file systems, network services, hardware, nondeterministic APIs, interactive inputs, or distributed execution. Large-scale evaluation may require sandboxing and timeouts. In such settings, the question is not whether execution should be used when it is available. It should. The question is what other evidence can support triage, explanation, and prioritization when execution is absent, partial, or costly.
+
+\textbf{The research gap.} Existing work often asks, ``How accurate is this metric?'' EviCode asks a different question: ``What evidence is the metric using, and which evidence genuinely contributes to semantic verification?'' This shift matters because a verifier should not only say that a candidate is likely correct. It should explain why: syntax is valid, API evidence is weak, identifier roles are suspicious, control flow is preserved, execution failed on boundary tests, and the overall confidence is low. Such explanations are useful for routing generated code to repair, execution, review, or rejection.
+
+EviCode, short for Evidence for Code, treats verification as an empirical study of evidence rather than another monolithic score. It separates evidence extraction from evidence fusion. Each evidence source produces an observation about a source-target program pair. A transparent fusion model is used only as an analysis instrument for combining those observations into a confidence score. The scientific contribution is the decomposition: it lets us ask which non-execution signals are worth keeping, which sources are complementary, which are redundant, how much execution changes the decision, and whether confidence is calibrated on external LLM translations.
+
+This paper makes four contributions. First, it formalizes semantic verification as evidence extraction, hierarchy, cost, complementarity, and calibration rather than as a search for a single best metric. Second, it implements a reproducible evidence taxonomy spanning lexical, syntactic, structural, API, identifier, data-flow, type, retrieval, and execution evidence. Third, it quantifies the semantic information carried by each category of static evidence, showing which signals are useful for ranking, diagnosis, and failure explanation even when they cannot certify correctness. Fourth, it evaluates evidence-fused confidence on real Python-to-Java translations from DeepSeekCoder, QwenCoder, and StarCoder, showing that calibrated verification scores can support triage without pretending to replace execution.
+
+The novelty is not the use of a particular classifier or the observation that execution is valuable. A practitioner could compute many features and train a logistic model, but that alone would not answer the scientific questions studied here: which evidence sources carry semantic information, which are complementary or redundant, how evidence changes under execution constraints, and which design principles follow for future verification metrics. EviCode therefore treats feature fusion as an instrument for evidence measurement, not as the contribution itself.
+
+This distinction changes the object of study from a trained verifier to the evidence that a verifier can observe. A high score is useful only after its source is understood: lexical resemblance, syntactic validity, structural alignment, API consistency, identifier roles, data-flow behavior, retrieval similarity, or execution. EviCode makes those ingredients explicit so that verification research can move from reporting aggregate scores toward explaining why generated programs should or should not be trusted.
+
+The conceptual view is an evidence ladder rather than a single-score pipeline. As summarized in Figure~\ref{fig:evidence-ladder}, machine-generated code first produces a candidate, and verification then accumulates evidence from cheap surface signals toward behavior-observing execution when it is available. The final object is not merely a score; it is a trust decision with an explanation of which evidence supported or weakened that decision.
+
+\begin{figure}[!htbp]
+  \centering
+  \IfFileExists{../figures/evidence_ladder.pdf}{\includegraphics[width=\linewidth]{../figures/evidence_ladder.pdf}}{\fbox{Evidence ladder figure not yet generated}}
+  \caption{Conceptual view of semantic verification as evidence integration: progressively richer evidence sources add semantic information, usually with higher extraction cost and stronger environmental assumptions.}
+  \label{fig:evidence-ladder}
+\end{figure}
+
+\section{Related Work}
+\subsection{Textual and Code-Aware Metrics}
+BLEU was originally designed for machine translation, where n-gram overlap often correlates with output quality~\cite{papineni2002bleu}. Its adoption in code generation was natural but imperfect: code has syntax, types, APIs, and execution semantics that are not captured by token overlap alone. CrystalBLEU improves robustness by discounting common n-grams that appear across many solutions~\cite{efstathiou2017crystalbleu}, while CodeBLEU combines lexical overlap with AST and data-flow-inspired components~\cite{ren2020codebleu}. These metrics are important because they show a clear historical movement from text toward structure. EviCode continues that movement but changes the question from ``what is the best scalar metric?'' to ``which evidence sources explain verification performance and failure?''
+
+This progression can be read as an evidence timeline, summarized in Table~\ref{tab:metric-evolution}. The key point is that each metric exists because the previous level of evidence left important failures invisible. BLEU cannot see syntax. Syntax-aware metrics cannot fully see behavior. Execution sees behavior only under available tests. Learned evaluators can combine signals, but without evidence decomposition they may hide which signals are actually responsible for trust.
+
+The remaining gap is therefore not the absence of another scalar metric. It is the absence of a systematic account of what each metric observes, what it misses, and which observations actually contribute semantic information.
+
+\begin{table}[!htbp]
+\centering
+\caption{Evolution of generated-code verification metrics as progressively richer evidence sources.}
+\label{tab:metric-evolution}
+\footnotesize
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{@{}lp{0.32\columnwidth}p{0.48\columnwidth}@{}}
+\toprule
+Stage & Observes & Typical blind spot \\
+\midrule
+BLEU & token n-grams & syntax and behavior \\
+CrystalBLEU & rare code n-grams & deeper semantics \\
+CodeBLEU & tokens, AST, data flow & execution behavior \\
+Execution & test outcomes & untested behavior \\
+Learned evaluators & fused correlations & hidden evidence use \\
+EviCode & decomposed evidence & formal equivalence \\
+\bottomrule
+\end{tabular}
+}
+\vspace{0.5em}
+\end{table}
+
+\subsection{Execution-Based Code Evaluation}
+HumanEval made execution-based functional correctness a central evaluation protocol for code generation~\cite{chen2021evaluating}. MultiPL-E extended unit-test-driven evaluation to many languages~\cite{cassano2023multiple}, and HumanEval-X provided multilingual generation and translation tasks with CodeGeeX~\cite{zheng2023codegeex}. Broader code-generation benchmarks such as APPS and AlphaCode similarly emphasize that generated programs must ultimately be judged behaviorally~\cite{hendrycks2021apps,li2022competition}. Execution is attractive because it evaluates behavior rather than surface form. However, software-testing research has long shown that tests are constrained by oracle availability, coverage, adequacy, and selection cost~\cite{barr2015oracle,inozemtseva2014coverage,jia2011mutation,yoo2012regression}. EviCode does not argue against execution; it treats execution as the strongest available evidence in the evaluated setting and studies what remains useful when execution is partial, expensive, or absent.
+
+The remaining gap is a measurement problem: execution gives strong behavioral evidence when tests and environments are available, but existing evaluation protocols rarely quantify which static evidence can help before, beside, or after execution.
+
+\subsection{Program Translation and Code Intelligence}
+Neural program translation systems such as TransCoder established that models can translate across programming languages without direct parallel supervision~\cite{roziere2020transcoder}. Code representation models such as CodeBERT, GraphCodeBERT, and CodeT5 learn representations that support search, summarization, generation, and translation~\cite{feng2020codebert,guo2021graphcodebert,wang2021codet5}. Benchmarks such as CodeXGLUE organize many of these tasks under shared evaluation settings~\cite{lu2021codexglue}. These systems increase the need for verification: as generators become more capable, the bottleneck shifts from producing candidates to deciding which candidates are trustworthy.
+
+Earlier representation-learning work also motivates evidence decomposition. Neural models over paths, trees, and tokens showed that programs expose multiple useful views rather than a single natural representation~\cite{alon2019code2vec,mou2016tbcnn,allamanis2018survey}. Code search and clone-detection studies similarly compare lexical, structural, and semantic similarity~\cite{sajnani2016sourcerercc,jiang2007deckard,roy2009comparison}. EviCode borrows this multi-view intuition but uses it for verification measurement: the goal is not only to represent code, but to ask which representation-derived evidence supports trust in a generated candidate.
+
+The remaining gap is that representation studies usually optimize task performance, while EviCode asks a different empirical question: which representation-derived signals remain useful as evidence of semantic correctness?
+
+\subsection{Static Analysis and Semantic Evidence}
+Static analysis studies what can be inferred about a program without running it. Classic foundations include abstract interpretation~\cite{cousot1977abstract}, data-flow analysis, control-flow analysis, type checking, pointer analysis, and program slicing~\cite{hind2001pointer,tip1995slicing}. Formal verification and proof-carrying-code traditions show that strong guarantees are possible when specifications and proof obligations are available~\cite{necula1997proof,leino2010dafny}. Neural-code evaluation usually operates in a less controlled setting: generated snippets may be incomplete, multilingual, dependency-sensitive, or syntactically noisy. EviCode uses the term \emph{evidence} deliberately: an AST-shape score or API-overlap score is not a proof of equivalence. It is an observable signal whose contribution can be measured.
+
+Program repair research provides a parallel lesson. Automated repair systems such as GenProg and later repair benchmarks made test suites central to patch validation~\cite{legoues2012genprog,just2014defects4j}. Empirical repair studies and surveys emphasize that plausible patches can pass available tests while remaining semantically wrong~\cite{monperrus2018automatic,tufano2019empirical,gazzola2019automatic}. That problem is closely related to generated-code verification: tests are indispensable, but test adequacy and explanation still matter. EviCode's contribution is to measure the non-execution evidence that can accompany such test-based judgments.
+
+The remaining gap is that static analysis and repair research provide many sources of evidence, but generated-code evaluation rarely measures their individual and joint contributions as verification evidence.
+
+\subsection{Learned Evaluators and Calibration}
+Learned evaluators can combine multiple signals into a prediction, but their usefulness depends on the evaluation goal. If the goal is only binary classification, a threshold may suffice. If the goal is practical triage, the probability itself matters: a verifier that says 0.9 should be correct about 90\% of the time. Calibration has long been studied in machine learning~\cite{guo2017calibration}. EviCode applies this perspective to generated-code verification by reporting Brier score, expected calibration error, and reliability curves on external LLM translations.
+
+The remaining gap is interpretability: a calibrated score is useful, but a calibrated evidence score is more useful because it can say which observations produced the confidence.
+
+\section{Problem and Running Examples}
+Let $x$ be a source program and $y$ be a generated candidate in a target language. Semantic verification asks whether $y$ preserves the intended behavior of $x$ for the task under consideration. This question is related to, but distinct from, textual similarity, parseability, compilation, and passing tests. Each of those observations is evidence about correctness; none is the definition of correctness by itself.
+
+The motivating cases form a compact gallery of failures that occur repeatedly in generated-code evaluation, as shown in Table~\ref{tab:running-example}. The purpose of the table is not to claim that these examples are difficult for humans. Their value is diagnostic: each example isolates a way in which one evidence source can be high while semantic correctness is low, or one evidence source can be low while semantic correctness is high. A verifier that collapses all cases into a single similarity number loses this diagnostic structure.
+
+\begin{table}[!htbp]
+\centering
+\caption{Motivating examples showing why semantic verification requires multiple evidence sources rather than a single textual metric.}
+\label{tab:running-example}
+\footnotesize
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{@{}lll@{}}
+\toprule
+Case & Candidate behavior & Evidence lesson \\
+\midrule
+A & \texttt{return a - b;} & high lexical/AST similarity; wrong operator \\
+B & \texttt{return b + a;} & lower ordered overlap; equivalent behavior \\
+C & \texttt{Math.plus(a,b)} & plausible intent; invalid API \\
+D & swaps parameter roles & identifiers present; data-flow mismatch \\
+E & handles only \texttt{a==0} & passes weak tests; partial correctness \\
+F & uses different loop & structure differs; may be equivalent \\
+G & parses but misses import & syntax succeeds; compilation/API fails \\
+H & passes examples only & dynamic evidence depends on test budget \\
+\bottomrule
+\end{tabular}
+}
+\vspace{0.5em}
+\end{table}
+
+These examples also explain why evidence forms a hierarchy. Lexical evidence sees names and tokens. Syntactic evidence sees whether the target is a valid program. Structural evidence sees organization. Behavioral static evidence, such as data-flow and API evidence, sees relationships among values and operations. Dynamic evidence sees concrete executions. Each level adds semantic information, but each level also costs more, depends on more language infrastructure, or requires more environmental support.
+
+\section{Formal Model}
+\subsection{Semantic Verification}
+For a task domain $\mathcal{D}$, source program $x$, and candidate $y$, semantic verification asks whether the two programs induce the same task-relevant behavior:
+\[
+c(x,y)=\mathbf{1}[\forall z \in \mathcal{D},\; \mathcal{B}(x,z) = \mathcal{B}(y,z)].
+\]
+The function $\mathcal{B}(p,z)$ denotes the behavior of program $p$ on input $z$. In practice, $\mathcal{D}$ is rarely fully observable. Tests sample it, static analysis approximates it, and similarity metrics observe proxies. This is why EviCode studies evidence rather than claiming formal equivalence.
+
+\subsection{Evidence Hierarchy}
+EviCode organizes evidence into an ordered hierarchy:
+\[
+\mathcal{H} = \langle L, S, R, B, D \rangle,
+\]
+where $L$ is lexical evidence, $S$ is syntactic evidence, $R$ is structural evidence, $B$ is static behavioral evidence, and $D$ is dynamic execution evidence. The ordering is not a claim that every higher level is always better. It expresses what the source can observe. Lexical features observe surface form; syntax observes grammatical validity; structure observes program organization; static behavioral evidence observes value and API relationships; execution observes behavior on concrete inputs.
+
+\subsection{Evidence Sources and Evidence Vectors}
+An evidence source is a function
+\[
+e_i : (x,y) \rightarrow \mathbb{R}^{d_i},
+\]
+where $x$ is the source program, $y$ is the generated candidate, and $d_i$ is the number of values emitted by source $i$. In plain terms, an evidence source is a measurement procedure: token overlap emits lexical evidence, parser success emits syntactic evidence, and test execution emits dynamic evidence.
+
+The full evidence vector is the concatenation of available sources:
+\[
+E(x,y) = [e_1(x,y), e_2(x,y), \ldots, e_k(x,y)].
+\]
+This vector is the central object in EviCode. It keeps evidence modular, allowing the study to remove, add, or compare sources without changing the verification task. The scientific reason for introducing $E(x,y)$ is that it separates observation from judgment. Traditional metrics often collapse both steps into one number. EviCode first records what can be observed and only then asks how those observations support a correctness decision.
+
+\subsection{Information, Complementarity, and Redundancy}
+The informativeness of an evidence source can be expressed through mutual information:
+\[
+I(e_i;c) = \sum_{e_i,c} p(e_i,c)\log \frac{p(e_i,c)}{p(e_i)p(c)}.
+\]
+In plain English, $I(e_i;c)$ is high when observing evidence source $e_i$ reduces uncertainty about correctness. Mutual information is useful because it does not require a particular classifier; it asks whether a signal is related to the label at all.
+
+Conditional contribution asks whether the signal remains useful after other evidence is already known:
+\[
+I(e_i;c \mid S) = H(c \mid S) - H(c \mid S,e_i),
+\]
+where $S$ is a set of existing evidence sources and $H$ is entropy. If this value is small, $e_i$ may be redundant with $S$. If it is large, the source contributes information that the existing set did not contain.
+
+\subsection{Verification and Calibration}
+Evidence fusion maps the evidence vector to a confidence score:
+\[
+f_\theta(E(x,y)) = P_\theta(c=1 \mid E(x,y)),
+\]
+where $c=1$ means the candidate is semantically correct. The score is interpreted as confidence, not proof. A score of 0.8 means the verifier expects similar candidates to be correct roughly 80\% of the time if the model is calibrated.
+
+Calibration measures whether confidence behaves like probability. For confidence bins $B_m$, expected calibration error is:
+\[
+\mathrm{ECE} = \sum_{m=1}^{M}\frac{|B_m|}{n}
+\left|\mathrm{acc}(B_m)-\mathrm{conf}(B_m)\right|.
+\]
+This matters for engineering use. A verifier with high ranking quality but poor calibration may still be useful for sorting candidates, but it is risky as a trust score.
+
+\subsection{Cost, Complementarity, and Marginal Contribution}
+Each evidence source has an extraction cost:
+\[
+\kappa(e_i) = \mathrm{time}(e_i) + \lambda \cdot \mathrm{environment}(e_i),
+\]
+where the second term captures setup burden such as language runtimes or test harnesses. The exact scale is approximate, but the definition makes the trade-off explicit: a cheap static source and an expensive execution source should not be compared only by accuracy.
+
+Complementarity measures whether two evidence sets provide non-redundant information:
+\[
+\Delta(A,B) = Q(A \cup B) - \max(Q(A), Q(B)),
+\]
+where $Q$ is a verification quality measure such as F1 or ROC-AUC. Positive $\Delta$ means the combination does more than either source alone.
+
+Marginal contribution measures the value of adding one source to a context:
+\[
+M(e_i \mid S) = Q(S \cup \{e_i\}) - Q(S).
+\]
+This equation supports the main empirical question: not merely whether a source is good by itself, but whether it still helps after other evidence is already available. Together, these definitions turn semantic verification into a measurement problem. Correctness remains the target concept, but the paper studies the evidence by which correctness is estimated: information measures ask whether a source is predictive, complementarity asks whether it adds something new, calibration asks whether confidence can be trusted, and cost asks whether the evidence is practical to obtain.
+
+\subsection{Execution Budgets}
+An execution budget $b$ controls how much dynamic evidence is available:
+\[
+E_b(x,y) = E_{\mathrm{static}}(x,y) \cup E_{\mathrm{exec}}^b(x,y).
+\]
+When $b=0$, verification relies only on static evidence. Example-test and full-test settings represent larger budgets. This formulation makes it possible to measure how much static evidence can compensate when execution is limited.
+
+\section{Evidence Sources}
+EviCode uses evidence sources that are intentionally limited: each source provides evidence, not certainty. The taxonomy is organized around observability. Lexical sources observe text; syntax observes grammatical validity; structural sources observe program organization; operator, API, identifier, data-flow, and type sources observe increasingly behavior-proximal obligations; execution observes behavior on sampled inputs. The takeaway across sources is that verification improves when different kinds of imperfect evidence are made explicit and measured.
+
+\subsection{Lexical Evidence}
+Lexical evidence measures token overlap, edit similarity, and length ratio. It is historically important because early code-generation evaluation borrowed text metrics from machine translation: if a generated program uses many of the same tokens as the reference, it often reflects related intent. The algorithm tokenizes source and target code, normalizes common delimiters, and computes overlap and string-distance features. Its cost is low, and it works even when parsers or compilers are unavailable.
+
+The weakness is that lexical evidence observes surface form rather than behavior. In Table~\ref{tab:running-example}, \texttt{return a - b;} is lexically close to the correct implementation but wrong, while \texttt{return b + a;} may be lexically less similar but correct. Lexical evidence is therefore useful as a first-pass plausibility signal and for detecting gross mismatches, but it should not be interpreted as semantic verification.
+
+\subsection{Syntax Evidence}
+Syntax evidence asks whether the candidate is parseable in the target language. Formally, $e_{\mathrm{syn}}(y)=1$ when a target-language parser accepts $y$, and 0 otherwise. This evidence exists because generated code can look textually close to a reference while failing to be a legal program. A missing brace, malformed method signature, or invalid expression should be caught before more expensive reasoning.
+
+Syntax evidence is a filter, not a judge of behavior. Once both \texttt{a+b} and \texttt{a-b} parse, syntax cannot distinguish them. Its practical value is high because it cheaply eliminates unusable candidates and separates parse failures from deeper semantic failures. Its relationship to other evidence is sequential: many structural and data-flow features are meaningful only after parsing succeeds.
+
+\subsection{AST and Structural Evidence}
+AST evidence compares the shape of parsed programs: node categories, approximate depth, and structural patterns. The intuition comes from program analysis and tree-based code representation: programs are not bags of words; they are nested constructs. A translation from Python to Java often preserves a conditional, loop, or return-expression shape even when punctuation and keywords change.
+
+The limitation is equally important. Shape is not semantics. In the running example, addition and subtraction have nearly identical expression shape. Two implementations of the same algorithm may also use different structures, for example a loop instead of a library call. AST evidence is therefore most useful for detecting implausible structural drift and least useful for operator-level or API-level correctness unless combined with more specific signals.
+
+\subsection{Control-Flow and Operator Evidence}
+Control-flow evidence records branch, loop, and nesting patterns; operator evidence records arithmetic, comparison, and boolean operators. These sources move from syntax toward behavior because they capture how execution may proceed and which primitive operations are used. Candidate A in the running example is exposed by operator evidence because subtraction replaces addition, even though the AST shape remains close.
+
+The algorithm extracts lightweight statement and operator patterns from parser output or lexical fallbacks. Cost is moderate because parsing is usually required. Typical failures include equivalent rewrites with different control flow, such as replacing a loop with a stream operation, and non-equivalent code that preserves the same branch structure but changes predicates. This source is complementary to lexical and AST evidence because it focuses on behavior-relevant tokens rather than all tokens equally.
+
+\subsection{API and Identifier Evidence}
+API evidence compares calls, method names, imports, and library usage. Identifier evidence compares roles such as parameter names, local variables, and repeated identifier relationships. Candidate C in Table~\ref{tab:running-example} is an API failure: \texttt{Math.plus} may express the intended operation, but it is not a valid Java API for integer addition. Candidate D illustrates identifier risk: the right names may appear, but source and target roles can be swapped.
+
+These signals are valuable because many generated-code failures are not syntactic. They are wrong calls, missing imports, incorrect library idioms, or confused variables. Their limitation is language and domain specificity. Correct translations often replace one idiom with another, and identifier names can change harmlessly. API and identifier evidence should therefore be interpreted as role consistency evidence, not as a requirement for literal name preservation.
+
+\subsection{Data-Flow and Type Evidence}
+Data-flow evidence approximates how values move between definitions, uses, calls, and returns. Type evidence records declared and inferred type-like patterns where available. These sources are closer to semantic analysis than lexical overlap because they ask whether the same values appear to influence the same outputs. If the source returns a value derived from both parameters but the candidate ignores one parameter, data-flow evidence should weaken confidence even when syntax and formatting look normal.
+
+EviCode's implementation is deliberately lightweight; it is not a full interprocedural static analyzer. That choice keeps the framework usable across noisy generated snippets and multiple languages, but it limits precision. The source is diagnostic rather than definitive. It can reveal value-flow and type-shape mismatches; it cannot prove semantic equivalence.
+
+\subsection{Retrieval Evidence}
+Retrieval evidence compares a candidate to nearby examples or known solution patterns. The intuition is that generated code resembling known correct solutions may deserve more trust, while code far from any known pattern may require execution or review. This mirrors the way developers often reason: unfamiliar code is not necessarily wrong, but it deserves more scrutiny.
+
+Retrieval evidence is useful when benchmark tasks have recognizable solution families. It is weaker when the correct solution is novel, when multiple algorithms are valid, or when similarity reflects memorized style rather than correctness. EviCode treats retrieval as supporting evidence, not a substitute for program reasoning.
+
+\subsection{Execution Evidence}
+Execution evidence runs tests and records pass/fail outcomes. In this study, it is the strongest practical evidence because it observes behavior under the available test suites. In the running example, execution immediately distinguishes \texttt{a+b} from \texttt{a-b} on nontrivial inputs. It can also expose partial correctness: a candidate that passes one example may fail a boundary input.
+
+The limitation is not that execution is a weak idea. The limitation is that execution evidence is bounded by the available tests and environment. Missing tests, weak tests, compilation dependencies, external services, sandboxing, timeouts, and hardware assumptions can all limit availability. EviCode therefore treats execution as powerful but budgeted evidence. When full tests are available, they should receive the greatest trust; when they are not, static evidence becomes valuable for triage and explanation.
+
+The taxonomy leads to a central expectation tested later in the paper. Evidence sources closer to behavior should generally be more reliable for final correctness, while cheaper static evidence should be most useful for ranking, diagnosis, and explanation. The experiments evaluate this expectation rather than assuming it.
+
+\section{Research Questions}
+EviCode asks six research questions.
+
+\textbf{RQ1: Informativeness.} Which evidence sources are individually most informative for semantic correctness?
+
+\textbf{RQ2: Complementarity.} Which evidence sources add value when combined, and which are redundant?
+
+\textbf{RQ3: Execution budget and cost.} How does verification change as dynamic evidence moves from unavailable to partial to full, and what infrastructure cost does each evidence source require?
+
+\textbf{RQ4: Failure explanation.} Can static evidence support actionable failure explanations rather than only binary correctness labels?
+
+\textbf{RQ5: External validation and calibration.} Does evidence-fused confidence generalize to real Python-to-Java LLM translations, and is that confidence useful for triage?
+
+\textbf{RQ6: Disagreement.} When evidence sources disagree, what do those disagreements reveal about the limits of existing metrics?
+
+\section{Architecture}
+The EviCode pipeline separates evidence extraction from confidence estimation. As shown in Figure~\ref{fig:pipeline}, a generated candidate is not sent directly to a black-box classifier. Instead, specialized extractors produce evidence, the fusion model estimates confidence, and the report names the strongest and weakest sources. This architecture reflects the evidence-centered view of verification: trust decisions should expose the observations behind them.
+
+\begin{figure*}[!t]
+  \centering
+  \IfFileExists{../EviCode_Block_Diagram.png}{\includegraphics[width=0.90\textwidth]{../EviCode_Block_Diagram.png}}{\fbox{EviCode block diagram not found}}
+  \caption{End-to-end EviCode workflow: a program pair is converted into explicit evidence signals, the signals are fused into a calibrated verification confidence, and the result is reported as a decision with interpretable supporting and weakening evidence.}
+  \label{fig:pipeline}
+\end{figure*}
+
+The pipeline in Figure~\ref{fig:pipeline} matters because it makes the verifier auditable. A monolithic score can be high for several incompatible reasons: lexical overlap, parse validity, structural similarity, successful tests, or dataset-specific correlations. EviCode preserves those reasons as separate evidence channels before fusion, which makes it possible to ask whether the verifier is relying on behavior, surface form, or an artifact of the benchmark.
+
+\section{Experimental Design}
+\subsection{Datasets}
+The main study uses HumanEval-X for Python, Java, and JavaScript. For each of 164 tasks, EviCode constructs directed source-target verification examples across the three languages. Positive examples pair programs for the same task. Negative examples are produced through task mismatching and controlled target mutation. This yields 2,952 verification examples: 984 positives and 1,968 negatives.
+
+\IfFileExists{../tables/dataset_statistics.tex}{\input{../tables/dataset_statistics.tex}}{}
+\IfFileExists{../tables/evidence_taxonomy.tex}{\input{../tables/evidence_taxonomy.tex}}{}
+
+The dataset scale in Table~\ref{tab:dataset-statistics} supports a controlled empirical study rather than a broad benchmark claim. The 2,952 examples are large enough for grouped train/test evaluation and paired statistical tests, while the 164 underlying problems keep the setting interpretable enough for qualitative disagreement analysis. The 1:2 positive-to-negative balance also matters: accuracy alone would be misleading, so the study emphasizes F1, AUC, calibration, and paired comparisons.
+
+The evidence taxonomy in Table~\ref{tab:evidence-taxonomy} shows why EviCode is not merely another similarity metric. The listed sources span low-cost lexical features, parse and AST evidence, control-flow and operator patterns, and API-level evidence. Most static sources are cheap, but they observe different failure surfaces. That diversity is the point: the framework can distinguish a malformed candidate from an API-incoherent candidate or a structurally plausible candidate with a wrong operator.
+
+The external validation setting uses real Python-to-Java translations produced by DeepSeekCoder, QwenCoder, and StarCoder over CodeNet-style programming problems. Scores are graded: 1 means parsable but not compilable, 2 means compilable but functionally incorrect, and 3 means functionally correct. Rows with score 0 are retained as unusable or unclean candidates when raw output is available. This external setting is used for confidence and calibration, not for retraining.
+
+\subsection{Models, Splits, and Statistics}
+Experiments use grouped problem-level train/test splitting so all directed pairs for a held-out task remain in the test partition. Logistic regression is used because it is transparent and stable for feature ablation; it is not claimed as the contribution. The study reports F1, ROC-AUC where appropriate, bootstrap confidence intervals, exact McNemar comparisons, mutual information, coefficient-based importance, cost estimates, and calibration metrics.
+
+\subsection{Evaluation Metrics}
+Evaluation uses both thresholded classification metrics and ranking/calibration metrics because semantic verification has two practical uses. A deployment system may need a hard decision, such as accept or reject, but it may also need a confidence score for routing candidates to execution, repair, or human review. Let $TP$, $FP$, $TN$, and $FN$ denote true positives, false positives, true negatives, and false negatives for the correctness label.
+
+For code, these counts have concrete engineering meanings. A true positive is a generated program that the verifier accepts and that is correct under the available oracle. A false positive is a generated program that the verifier accepts even though it fails the correctness label; this is the most risky error because wrong code may be routed downstream. A false negative is a correct generated program that the verifier rejects or deprioritizes; this wastes useful candidates. A true negative is an incorrect generated program that is correctly rejected. The metrics below therefore measure not only classifier behavior, but also how safely a verifier can support code-generation workflows.
+
+The metrics are applied to code in two ways. For EviCode, the model outputs a probability that a source-target program pair is semantically correct. Thresholded metrics such as F1 evaluate the resulting accept/reject decision, while AUC evaluates whether correct programs receive higher confidence than incorrect programs. For BLEU, CrystalBLEU, TF-IDF, and CodeBLEU, the metric first produces a similarity score between the generated target program and a reference implementation. EviCode then evaluates that score as a verification signal by asking whether higher similarity actually corresponds to functional correctness. Execution is different: it runs the generated program on tests and converts observed behavior into dynamic evidence.
+
+Accuracy measures the fraction of correct decisions:
+\[
+\mathrm{Accuracy}=\frac{TP+TN}{TP+TN+FP+FN}.
+\]
+Accuracy is reported where useful, but it is not the main metric because the benchmark has more negative than positive examples. A verifier can therefore obtain deceptively high accuracy by rejecting many candidates. Precision, recall, and F1 provide a more informative view of correctness detection:
+\[
+\mathrm{Precision}=\frac{TP}{TP+FP}, \qquad
+\mathrm{Recall}=\frac{TP}{TP+FN},
+\]
+\[
+\mathrm{F1}=2\cdot
+\frac{\mathrm{Precision}\cdot\mathrm{Recall}}
+{\mathrm{Precision}+\mathrm{Recall}}.
+\]
+F1 is the main thresholded metric in the HumanEval-X experiments because it penalizes both accepting incorrect code and rejecting correct code.
+
+ROC-AUC evaluates ranking quality rather than one threshold. If $s^+$ is the verifier score for a randomly chosen correct candidate and $s^-$ is the score for a randomly chosen incorrect candidate, ROC-AUC can be interpreted as:
+\[
+\mathrm{AUC}=P(s^+>s^-)+\frac{1}{2}P(s^+=s^-).
+\]
+This interpretation is important for EviCode because static evidence may not be strong enough to certify correctness, yet it can still rank candidates usefully for triage. PR-AUC summarizes the precision-recall curve:
+\[
+\mathrm{PR\text{-}AUC}=\int_0^1 \mathrm{Precision}(r)\,dr,
+\]
+where $r$ denotes recall. PR-AUC is useful when positive examples are relatively scarce because it focuses on the quality of retrieved correct candidates.
+
+The lightweight similarity baselines are included to show the limits of surface and structure-aware resemblance. BLEU computes modified n-gram precision with a brevity penalty:
+\[
+\mathrm{BLEU}=\mathrm{BP}\cdot
+\exp\left(\sum_{n=1}^{N} w_n \log p_n\right),
+\]
+where $p_n$ is modified n-gram precision, $w_n$ is the n-gram weight, and $\mathrm{BP}$ penalizes overly short candidates. CrystalBLEU uses the same general form after discounting frequent code n-grams that often reflect boilerplate rather than semantic correctness. CodeBLEU combines several code-aware components:
+\[
+\begin{aligned}
+\mathrm{CodeBLEU}={}&\alpha\,\mathrm{BLEU}
++\beta\,\mathrm{WeightedBLEU}\\
+&+\gamma\,\mathrm{ASTMatch}\\
+&+\delta\,\mathrm{DataFlowMatch},
+\end{aligned}
+\]
+with nonnegative weights that sum to one. These metrics are useful comparison points because they observe text and structure, but they do not directly observe execution behavior.
+
+Calibration metrics evaluate whether confidence scores behave like probabilities. The Brier score measures mean squared probability error:
+\[
+\mathrm{Brier}=\frac{1}{n}\sum_{i=1}^{n}(p_i-y_i)^2,
+\]
+where $p_i$ is the predicted probability of correctness and $y_i\in\{0,1\}$ is the observed label. Expected calibration error groups predictions into confidence bins $B_m$:
+\[
+\mathrm{ECE} = \sum_{m=1}^{M}\frac{|B_m|}{n}
+\left|\mathrm{acc}(B_m)-\mathrm{conf}(B_m)\right|.
+\]
+Low Brier score and low ECE indicate that a verifier's confidence can support resource-allocation decisions, such as when to run full tests.
+
+Statistical validation uses bootstrap intervals and paired McNemar tests. Bootstrap confidence intervals estimate uncertainty by repeatedly resampling held-out predictions. McNemar's test compares two systems on the same examples using the off-diagonal counts $b$ and $c$, where $b$ is the number of examples correct only for the baseline and $c$ is the number correct only for the comparison system:
+\[
+\chi^2 = \frac{(|b-c|-1)^2}{b+c}.
+\]
+This paired test is appropriate because evidence configurations are evaluated on the same held-out tasks; it asks whether their disagreements are large enough to support a real difference in decisions.
+
+\section{Results and Analysis}
+The results are organized as an evidence argument rather than as a sequence of independent measurements. The section first establishes how much semantic information is available before execution, then studies which evidence sources add non-redundant signal, how cost changes the value of evidence, how evidence supports failure explanation, and whether confidence transfers to external LLM translations. The tables and figures provide the measurements, but the primary goal is to explain what those measurements imply for the design of future code verifiers.
+
+\subsection{RQ1: Which Evidence Is Informative?}
+\subsubsection{Evidence Strength Follows Observability}
+The first result establishes a discontinuity between representation-based and behavior-based verification. Table~\ref{tab:evidence-group-results} and Figure~\ref{fig:main-results-f1} show that enriched static evidence reaches F1 0.526, while dynamic evidence reaches F1 0.904. This is not merely a larger number for execution. It marks a change in what the verifier can observe. Static evidence estimates semantics from tokens, parse validity, AST shape, operators, identifiers, and API patterns; execution observes program consequences on concrete inputs. The 72\% relative F1 increase therefore reflects a conceptual transition from approximating semantic plausibility to observing tested behavior. That distinction is central to the evidence view: execution is strong because it changes the verification problem, not because it is simply another feature group with a higher coefficient.
+
+The same table also shows why static evidence should not be dismissed. Static verification reaches AUC 0.807 without running the candidate. This is high enough to indicate that semantic plausibility is visible before behavioral confirmation, even though the same evidence is too weak for final certification. Generated programs often preserve enough lexical, structural, and target-language information to support prioritization. Thus, the practical role of static evidence is not to prove correctness, but to order candidates, reject implausible outputs early, and decide where execution or human review should be spent.
+
+\subsubsection{Static Evidence Supports Prioritization}
+The gap between F1 and AUC is itself informative. Static evidence has modest thresholded F1 but strong ranking ability, which means it often orders candidates sensibly even when a single accept/reject boundary is unreliable. This distinction separates two roles for evidence. Behavior-based evidence is suitable for certification when the tests are available and meaningful. Representation-based evidence is suitable for prioritization because it cheaply estimates plausibility. In practical terms, static evidence can separate hopeless candidates from plausible ones, route suspicious translations to execution or repair, and explain why a candidate deserves scrutiny.
+
+The individual evidence groups clarify this point. Lexical evidence has F1 0.362 and AUC 0.732, while the syntactic group has much lower F1 0.096 and AUC 0.636. This does not mean syntax is useless. It means parse validity is close to a binary gate: once many candidates parse, syntax alone has little ability to rank semantic quality. Lexical overlap, although superficial, remains useful because correct translations often preserve names, operators, constants, and local expression patterns. The result is counterintuitive only if syntax is assumed to be inherently more semantic than tokens. In this setting, syntax removes invalid programs, while lexical evidence retains graded information about translation plausibility.
+
+\subsubsection{Fusion Improves Confidence Structure}
+Fusion confirms that static evidence mainly refines confidence once behavior has been observed. Static plus example execution reaches F1 0.873, static plus full execution reaches F1 0.889, and the all-evidence model reaches F1 0.894 with the strongest AUC, 0.958. The thresholded F1 values change only modestly across execution-heavy configurations because execution already contains most of the decision-relevant behavioral information. The larger AUC effect tells a different story: static evidence improves confidence ordering among candidates whose execution evidence may be similar, partial, or noisy.
+
+This is an important design insight. Evidence fusion should not be judged only by whether it beats execution at one operating threshold. When F1 barely changes but AUC improves, the verifier has become better at ranking uncertainty rather than simply producing more positive labels. That is useful for downstream systems that must decide which candidates to execute fully, repair, accept with caution, or send to a developer. Static evidence is therefore complementary to execution primarily as confidence refinement and explanation, not as a replacement for behavioral information.
+
+\IfFileExists{../tables/evidence_group_results.tex}{\input{../tables/evidence_group_results.tex}}{}
+\IfFileExists{../tables/evidence_informativeness.tex}{\input{../tables/evidence_informativeness.tex}}{}
+\IfFileExists{../tables/evidence_hierarchy.tex}{\input{../tables/evidence_hierarchy.tex}}{}
+\FloatBarrier
+
+\subsubsection{Useful Static Evidence Exposes Failure Modes}
+The feature-level evidence explains which non-execution signals deserve attention. Table~\ref{tab:evidence-informativeness} and Figure~\ref{fig:evidence-informativeness} show that full execution has MI 0.409 and example execution has MI 0.356, while the strongest static features are much smaller: token overlap at MI 0.109 and AST node similarity at MI 0.108. Execution therefore carries roughly four times as much individual label information as the strongest static feature. The interpretation is not simply that execution is better; it is that behavioral observation removes uncertainty more efficiently than representational similarity.
+
+The static ordering is more interesting than a flat ranking. Token overlap and AST node similarity have nearly equal MI, but token overlap has AUC 0.739 whereas AST node similarity has AUC 0.550. This mismatch shows that mutual information and ranking ability capture different aspects of evidence. AST similarity can be informative in aggregate because correct and incorrect candidates often differ structurally, but it is weak as a ranker because many wrong translations preserve the same tree shape as the reference. It captures construction similarity, not semantic correctness. Identifier overlap has lower MI, 0.059, but respectable AUC 0.709, suggesting that names can help rank plausibility even when they are not a decisive source by themselves.
+
+Operator-pattern evidence provides the clearest design lesson. Its MI, 0.069, is below AST similarity, but its AUC, 0.633, is more semantically meaningful because small operator or predicate changes can completely alter behavior while preserving the surrounding AST. This explains why high-level structural similarity can be less discriminative than low-level behavioral primitives. Static evidence should therefore be selected for the failure modes it exposes: token overlap for cheap plausibility, AST similarity for construction alignment, identifiers for role continuity, and operator patterns for local computation changes.
+
+\subsubsection{Verification Behaves Like Progressive Uncertainty Reduction}
+Table~\ref{tab:evidence-hierarchy} and Figure~\ref{fig:evidence-hierarchy} turn the same result into an empirical hierarchy for this benchmark. Lexical evidence alone reaches F1 0.362 and AUC 0.732. Adding syntactic evidence raises cumulative F1 to 0.460, a +0.098 gain, because parseability removes an entire class of invalid candidates. Adding structural evidence produces only a small additional gain, from 0.460 to 0.478, and behavioral-static evidence reaches 0.514. The largest transition occurs when dynamic evidence enters: F1 rises to 0.893, a +0.379 gain over behavioral-static evidence. This single dynamic increment exceeds the combined gains of the syntactic, structural, and behavioral-static levels.
+
+The shape of the hierarchy matters more than any one value. Static evidence reduces uncertainty gradually, then execution creates a qualitative transition. Structural evidence adds only +0.018 F1 after syntax, suggesting that much of the useful structural signal was already captured by validity and coarse form. Behavioral-static evidence adds +0.036, indicating that API, operator, identifier, and data-flow signals provide useful diagnostics but cannot replace observing behavior. The curve therefore resembles diminishing static returns followed by a behavioral phase transition. Verification is better understood as progressive semantic observability than as simple feature accumulation.
+
+\begin{figure}[!htbp]
+  \centering
+  \IfFileExists{../figures/main_results_f1.pdf}{\includegraphics[width=\linewidth]{../figures/main_results_f1.pdf}}{\fbox{Main results figure not yet generated}}
+  \caption{Held-out HumanEval-X verification F1 for each evidence configuration; execution-based configurations remain strongest, while enriched static evidence provides a weaker but available fallback.}
+  \label{fig:main-results-f1}
+\end{figure}
+
+\begin{figure}[!htbp]
+  \centering
+  \IfFileExists{../figures/evidence_informativeness.pdf}{\includegraphics[width=\linewidth]{../figures/evidence_informativeness.pdf}}{\fbox{Informativeness figure not yet generated}}
+  \caption{Mutual information between each evidence feature and the correctness label on HumanEval-X; higher values indicate features that are more individually predictive before fusion.}
+  \label{fig:evidence-informativeness}
+\end{figure}
+
+\begin{figure}[!htbp]
+  \centering
+  \IfFileExists{../figures/information_gain_hierarchy.pdf}{\includegraphics[width=0.88\linewidth]{../figures/information_gain_hierarchy.pdf}}{\fbox{Hierarchy figure not yet generated}}
+  \caption{Incremental information gain obtained as evidence groups are added from lexical/static signals toward execution evidence, showing where additional verification signal enters the hierarchy.}
+  \label{fig:evidence-hierarchy}
+\end{figure}
+
+\subsubsection{Implications}
+Together, these results support the view that semantic verification is an evidence accumulation process rather than a similarity scoring problem. Static evidence cannot certify correctness, but it substantially reduces uncertainty and enables effective prioritization before tests are available. Execution introduces a qualitative shift because it observes behavior rather than approximating it. Different static evidence sources matter because they expose different failure modes, making their combination more useful than any individual static metric. The proposed evidence ladder is therefore not only a conceptual organization; the experiments recover the same progression empirically, from surface plausibility to validity, from validity to program obligations, and from obligations to observed behavior.
+
+This interpretation also clarifies what future verification systems should optimize. If execution is unavailable, the objective is to maximize the usefulness of early evidence for routing and diagnosis. If execution is available, the objective shifts toward calibration, explanation, and confidence refinement. EviCode keeps both regimes visible: it can report not only whether execution succeeded, but also whether the candidate appeared syntactically valid, structurally aligned, API-consistent, and behaviorally plausible before tests were considered.
+
+\begin{keyfindingsbox}{RQ1}
+\item Execution changes verification from estimating semantics to observing tested behavior.
+\item Static evidence cannot certify correctness, but AUC 0.807 shows that semantic plausibility is visible before execution.
+\item Token overlap, syntax, AST similarity, identifiers, and operators serve different roles: plausibility, validity, alignment, role continuity, and local computation.
+\item The evaluated datasets empirically recover an evidence hierarchy, with gradual static gains followed by a large dynamic transition.
+\end{keyfindingsbox}
+
+The synthesis from RQ1 is that evidence usefulness is governed by what a source can observe. Surface and structural signals are valuable when the task is to rank or explain candidates, but behavior-observing evidence changes the verification problem because it tests consequences rather than resemblance. This establishes the hierarchy used in the remaining analyses: useful verification systems should preserve cheap static evidence, but should interpret it according to the uncertainty it can actually reduce.
+
+\subsection{RQ2: Which Evidence Is Complementary?}
+\subsubsection{Complementarity Comes From Different Failure Surfaces}
+Complementarity matters because a verifier should not collect many names for the same signal. Table~\ref{tab:evidence-complementarity} shows that execution-bearing combinations provide the strongest performance: static plus full execution reaches F1 0.889 and AUC 0.957, while static plus example execution reaches F1 0.873 and AUC 0.934. Among static-only combinations, lexical plus syntactic evidence reaches F1 0.460 and AUC 0.806, stronger than lexical plus structural evidence at F1 0.393 and AUC 0.717. Semantic-static plus syntactic evidence reaches F1 0.471 and AUC 0.802, showing that this combination is more useful for ranking candidates than for drawing a hard correctness boundary. The broader lesson is that complementarity is not equivalent to feature count. Evidence sources matter when they expose different failure surfaces: syntax filters invalid programs, lexical evidence estimates plausibility, semantic-static evidence captures obligations, and execution observes behavior.
+
+This changes how static evidence should be interpreted. Static evidence is not a weaker substitute for execution; it is a filter and explanation layer. If static evidence is high but execution fails, the disagreement identifies a subtle behavioral failure hidden behind plausible form. If static evidence is low before execution, the system can deprioritize expensive testing or route the candidate to repair. Overall, Table~\ref{tab:evidence-complementarity} shows why evidence integration differs from metric aggregation: the goal is not to maximize the number of signals, but to combine signals whose disagreements reveal something about correctness.
+
+\IfFileExists{../tables/evidence_complementarity.tex}{\input{../tables/evidence_complementarity.tex}}{}
+\IfFileExists{../tables/static_ablation.tex}{\input{../tables/static_ablation.tex}}{}
+\IfFileExists{../tables/evidence_importance.tex}{\input{../tables/evidence_importance.tex}}{}
+
+\subsubsection{Ablation Reveals Behavior-Proximal Static Signals}
+The ablation and importance results make the complementarity story concrete. Table~\ref{tab:static-ablation} shows what is lost when individual static sources are removed, while Table~\ref{tab:evidence-importance} and Figure~\ref{fig:evidence-importance} show which sources most influence the transparent fusion model. Full execution has the largest coefficient magnitude, 3.056, as expected. Below execution, token overlap and operator patterns have nearly equal influence, 0.482 and 0.467, while length ratio, example execution, parse validity, type consistency, and identifier-role consistency follow with coefficients 0.336, 0.302, 0.212, 0.196, and 0.186. The more interesting result is that operator patterns and token overlap matter more than broad AST node similarity. This challenges a common assumption in code intelligence that richer structural representation necessarily approximates semantics more closely. Many semantic errors are local computational changes, such as incorrect operators, predicates, API calls, or value roles, that preserve overall tree structure. Future metrics should therefore prioritize behavior-proximal evidence over representation complexity alone.
+
+The leave-one-out results therefore support a stronger claim than ``structure helps.'' Removing Syntax drops static F1 to 0.411, and removing operator-pattern similarity drops it to 0.474, a larger degradation than removing AST node similarity, which leaves F1 at 0.525. Removing token overlap leaves F1 at 0.494, confirming that surface evidence remains useful for ranking even though it is not semantic. Removing raw identifier evidence leaves F1 at 0.530, while removing identifier-role evidence lowers it to 0.506. The useful static evidence is not simply more structure; it is evidence that moves closer to program obligations: validity, operators, APIs, and value roles. Overall, the ablation tables show that the verifier's static value comes from a small set of semantically interpretable observations rather than from indiscriminate feature accumulation.
+
+\begin{figure}[!htbp]
+  \centering
+  \IfFileExists{../figures/evidence_complementarity_heatmap.pdf}{\includegraphics[width=\linewidth]{../figures/evidence_complementarity_heatmap.pdf}}{\fbox{Complementarity heatmap not yet generated}}
+  \caption{Correlation among implemented evidence features; high-correlation blocks indicate redundant signals, while lower correlation suggests complementary evidence for fusion.}
+  \label{fig:evidence-complementarity}
+\end{figure}
+
+\subsubsection{Correlation Separates Redundancy From New Evidence}
+The complementarity heatmap in Figure~\ref{fig:evidence-complementarity} acts as a redundancy map. The visible lexical, syntax/AST, API/identifier, and execution clusters show that several features measure related evidence rather than independent facts. Highly correlated feature blocks may improve robustness, but they do not necessarily add new semantic information. Lower-correlation blocks are more useful because they expose different failure surfaces: operator evidence catches small computation changes, API evidence catches target-language misuse, identifier-role evidence catches swapped responsibilities, and execution adjudicates behavior. This is why EviCode evaluates evidence combinations rather than treating all static features as a single undifferentiated representation.
+
+\begin{figure}[!htbp]
+  \centering
+  \IfFileExists{../figures/marginal_contribution_sources.pdf}{\includegraphics[width=\linewidth]{../figures/marginal_contribution_sources.pdf}}{\fbox{Importance figure not yet generated}}
+  \caption{Largest absolute logistic-fusion coefficients, used as a transparent proxy for which evidence features most influence the verifier's confidence.}
+  \label{fig:evidence-importance}
+\end{figure}
+
+\subsubsection{Implications}
+The RQ2 results show that the important distinction is not static versus dynamic alone, but behavior-proximal versus representation-proximal evidence. AST similarity is useful as an alignment signal, but operator, API, identifier-role, and execution evidence better capture the obligations that determine correctness. Semantic verification improves when the evidence vocabulary contains sources that can disagree for meaningful reasons. Future verification metrics should therefore report which evidence sources add unique information, rather than only reporting a single aggregate score.
+
+\begin{keyfindingsbox}{RQ2}
+\item Evidence sources are complementary when they expose different failure surfaces.
+\item AST similarity contributes less than intuition suggests once operator and behavior-level evidence are known.
+\item Identifier-role evidence is more useful than raw identifier overlap because it captures how names participate in computation.
+\item Future metrics should ablate evidence sources to distinguish useful signal from redundant representation.
+\end{keyfindingsbox}
+
+The synthesis from RQ2 is that the best static signals are not necessarily the richest representations. A compact feature that exposes a specific semantic failure, such as an operator change or role mismatch, can be more useful than a broad structural similarity score. This shifts the design criterion from feature sophistication to failure-mode coverage: evidence is worth keeping when it adds a new way to detect, rank, or explain incorrectness.
+
+\subsection{RQ3: How Much Execution Is Necessary?}
+\subsubsection{The First Behavioral Signal Changes the Regime}
+The cost results show that verification quality cannot be interpreted without evidence availability. HumanEval-X provides example and full tests but not a normalized list of individual cross-language assertions, so Table~\ref{tab:execution-budget} reports only the supported settings: no execution, example-test execution, and full-test execution. Finer-grained 1, 3, 5, and 10-test budgets are marked pending rather than inferred. This is not a cosmetic limitation. A weak-test curve should measure actual test weakening, not an artifact of inaccessible harness structure.
+
+Within the supported settings, the first dynamic signal has the largest payoff. Static-only verification reaches F1 0.526. Example-test execution reaches F1 0.862, a relative improvement of about 64\% over static-only verification. Full execution reaches F1 0.885, adding a much smaller gain over example execution than the initial move from static evidence to any behavior observation. This does not prove that example tests are sufficient in general; HumanEval-X examples are not a universal coverage model. It shows that the first reliable behavioral observation can change the verification regime: moving from representation to behavior reduces a different kind of uncertainty than adding more static representation.
+
+\IfFileExists{../tables/execution_budget_results.tex}{\input{../tables/execution_budget_results.tex}}{}
+\IfFileExists{../tables/evidence_costs.tex}{\input{../tables/evidence_costs.tex}}{}
+\IfFileExists{../tables/static_evidence_value.tex}{\input{../tables/static_evidence_value.tex}}{}
+
+\subsubsection{Cost Changes Which Evidence Is Worth Paying For}
+Cost changes the interpretation of accuracy, but raw elapsed time alone is not sufficiently informative. Table~\ref{tab:evidence-costs} shows that full execution has the largest MI, 0.409, but a lower cost-normalized value of 0.041 MI/ms because it requires runtime execution. Example execution follows with MI 0.356 and 0.036 MI/ms. By contrast, token overlap and AST node similarity have lower absolute MI, 0.109 and 0.108, but much higher MI/ms, 1.110 and 1.105, because they are cheap to extract. Operator patterns and identifier overlap also provide useful low-cost signal, with MI/ms 0.705 and 0.596. The stronger question is therefore which low-cost static feature exposes a distinct semantic failure mode. Table~\ref{tab:static-evidence-value} answers that question directly: token overlap is worth keeping as surface triage, AST similarity as structural alignment, operator patterns as local computation evidence, control flow as execution-shape evidence, and API or identifier-role signals as diagnostic evidence. These sources are valuable because they fail differently, not because each individually approaches execution accuracy.
+
+This reframes cost-benefit analysis as cost-normalized evidence design. A verifier should be evaluated not only by its best possible score, but also by the infrastructure it assumes and the kind of failure it can expose. Cheap evidence can reject malformed, API-incoherent, or suspicious candidates early, while expensive execution can be reserved for candidates whose correctness matters or whose static evidence is ambiguous. Overall, Tables~\ref{tab:evidence-costs} and~\ref{tab:static-evidence-value} show that the relevant engineering question is not ``which evidence is best?'' but ``which evidence should be paid for at which stage of verification?''
+
+\begin{figure}[!htbp]
+  \centering
+  \IfFileExists{../figures/execution_budget_curve.pdf}{\includegraphics[width=\linewidth]{../figures/execution_budget_curve.pdf}}{\fbox{Execution budget curve not yet generated}}
+  \caption{Verification performance for the evidence settings supported by the dataset, separating execution-only decisions from EviCode evidence-fusion settings.}
+  \label{fig:execution-budget}
+\end{figure}
+
+Figure~\ref{fig:execution-budget} therefore uses a discrete evidence-setting comparison rather than a continuous curve. It compares what the dataset can actually support: static-only evidence at F1 0.526, execution-only example tests at 0.862, execution-only full tests at 0.885, and the fused static-plus-execution settings discussed above. The unsupported 1, 3, 5, and 10-test rows in Table~\ref{tab:execution-budget} identify a benchmark-design gap. If future work wants to answer how much execution is necessary, benchmarks need to publish tests as separable budget units rather than only as aggregate harnesses.
+
+\begin{figure}[!htbp]
+  \centering
+  \IfFileExists{../figures/cost_information_pareto.pdf}{\includegraphics[width=\linewidth]{../figures/cost_information_pareto.pdf}}{\fbox{Pareto figure not yet generated}}
+  \caption{Cost-information view comparing each evidence source's mutual information with its cost-normalized information per millisecond, separating absolute semantic signal from inexpensive triage value.}
+  \label{fig:cost-pareto}
+\end{figure}
+
+Figure~\ref{fig:cost-pareto} separates absolute information from cost-normalized value. The left panel shows that full and example execution carry the most label information, followed by token overlap, AST similarity, operator patterns, and identifier overlap. The right panel reverses the deployment intuition: cheap static sources dominate MI/ms, while execution has lower information per millisecond despite stronger absolute signal. This distinction matters because execution carries stronger semantic information, but it also requires tests, runtimes, and sandboxing. Cheap static signals such as token, AST, operator, and parse evidence provide less absolute certainty but strong triage value per unit cost. Evidence quality is therefore multi-dimensional: the best evidence for final correctness is not always the best evidence for early decision-making. Cost-aware verification should match evidence cost to decision risk rather than applying the most expensive signal to every candidate.
+
+\subsubsection{Deployment Depends on Availability, Not Only Accuracy}
+The execution-budget results imply a staged deployment model. A system can begin with cheap static screening, run small or example-level tests when available, and reserve full execution for candidates that remain plausible or high risk. This does not make execution optional; it makes execution a resource that should be allocated according to confidence, cost, and failure risk. RQ3 therefore contributes a cost model for evidence integration: verification systems should be compared not only by final accuracy, but by how efficiently they acquire evidence under realistic infrastructure constraints.
+
+\begin{keyfindingsbox}{RQ3}
+\item The first available dynamic evidence produces the largest performance gain.
+\item Raw extraction time is too coarse for static evidence; cost-normalized value depends on distinct failure coverage.
+\item Token, AST, operator, control-flow, API, and identifier-role signals are worth keeping for different diagnostic reasons.
+\item Benchmarks should expose tests as separable budget units to support future execution-budget studies.
+\end{keyfindingsbox}
+
+The synthesis from RQ3 is that evidence value is conditional on both information and availability. Execution provides the strongest signal in the evaluated settings, but it also requires the most infrastructure. Cheap static evidence is therefore most useful before execution, during triage, or when execution budgets are constrained; once behavioral evidence is available, static sources mainly improve confidence structure and explanation.
+
+\subsection{RQ4: Can Static Evidence Explain Failures?}
+\subsubsection{Evidence Turns Incorrectness Into Diagnoses}
+The explanation results show why a verifier should report more than correctness. Table~\ref{tab:failure-summary} and Figure~\ref{fig:failure-types} show that API mismatch and syntax failure dominate the rule-based failure distribution, with API mismatch accounting for 1,482 negative examples and syntax failure for 346. These counts partly reflect the synthetic negative construction, so they should not be treated as a universal taxonomy of LLM failures. Their value is diagnostic: they demonstrate that evidence vectors can turn the same binary label, incorrect, into different actionable explanations. Verification evidence can therefore support causal-style interpretation of failure symptoms, even when it does not prove formal semantic equivalence.
+
+This distinction matters for downstream repair and review. A syntax failure calls for parser- or formatting-level repair. An API mismatch calls for target-language library correction. A data-flow or control-flow mismatch suggests deeper semantic change. Without decomposed evidence, all of these cases collapse into the same negative label. With decomposed evidence, the verifier can explain why confidence is low and what kind of intervention is likely needed.
+
+\IfFileExists{../tables/weak_test_results.tex}{\input{../tables/weak_test_results.tex}}{}
+\IfFileExists{../tables/failure_summary.tex}{\input{../tables/failure_summary.tex}}{}
+\IfFileExists{../tables/failure_detection_matrix.tex}{\input{../tables/failure_detection_matrix.tex}}{}
+
+\subsubsection{Incomplete Tests Are Evidence Under a Budget}
+The weak-test analysis is a status result rather than a failed experiment. Static-only rows are feasible in Table~\ref{tab:weak-tests} and remain at F1 0.526 across the retained-test placeholders because no dynamic weakening is actually observable. Dynamic retained-test experiments at 100\%, 75\%, and 50\% retention are marked unsupported because the benchmark does not expose normalized individual tests. This repeats the same methodological lesson as the budget analysis: execution is central to semantic verification, but current benchmarks often make execution-strength analysis difficult. A future benchmark that exposes tests as separable budget units would allow controlled studies of how static evidence compensates as execution is weakened.
+
+\begin{figure}[!htbp]
+  \centering
+  \IfFileExists{../figures/failure_detection_matrix.pdf}{\includegraphics[width=\linewidth]{../figures/failure_detection_matrix.pdf}}{\fbox{Failure detection matrix not yet generated}}
+  \caption{Coverage matrix linking rule-based failure explanations to the evidence detectors that can identify them.}
+  \label{fig:failure-detection}
+\end{figure}
+
+\subsubsection{Coverage Reveals Missing Evidence Sources}
+Explanation coverage matters because an incorrect candidate can fail for very different reasons. Table~\ref{tab:failure-detection} reports detector-level coverage, and Figure~\ref{fig:failure-detection} maps which failure explanations are currently supported by the evidence vocabulary. Syntax failures are fully covered by syntax and execution evidence and have high API and data-flow coverage, 0.829 and 0.723, because malformed candidates often disturb several static signals. API mismatch is fully covered by API evidence and strongly covered by execution, 0.875, while data-flow mismatch is fully covered by data-flow evidence but only 0.534 by execution. Control-flow mismatch is harder, with data-flow coverage 0.387 and execution coverage 0.484. Missing or weak coverage is not merely an implementation limitation; it identifies future evidence sources. Richer type analysis could improve API and compilation explanations, while deeper control-flow and path-sensitive analysis could improve semantic mismatch explanations. Overall, Table~\ref{tab:failure-detection} shows that explanation coverage can be used as a design criterion for future verifiers: if a failure mode cannot be explained, the evidence vocabulary is incomplete.
+
+\begin{figure}[!htbp]
+  \centering
+  \IfFileExists{../figures/failure_type_distribution.pdf}{\includegraphics[width=\linewidth]{../figures/failure_type_distribution.pdf}}{\fbox{Failure distribution not yet generated}}
+  \caption{Distribution of rule-based failure explanations among negative HumanEval-X examples; the synthetic construction makes this diagnostic rather than representative of all LLM failures.}
+  \label{fig:failure-types}
+\end{figure}
+
+\subsubsection{Implications}
+Failure explanation changes verification from a score into a diagnostic process. A binary verifier can say that a candidate is wrong; an evidence-grounded verifier can say whether the candidate is syntactically invalid, API-incoherent, structurally plausible but behaviorally wrong, or suspicious because identifiers and value roles disagree. RQ4 therefore contributes a different kind of result from RQ1--RQ3: it shows that evidence decomposition can make verification actionable. This makes the framework useful beyond translation, including repair, synthesis, and code review workflows.
+
+\begin{keyfindingsbox}{RQ4}
+\item Evidence vectors can convert binary incorrectness into actionable failure categories.
+\item API mismatch and syntax failure dominate the current diagnostic distribution, partly due to synthetic negative construction.
+\item Explanation coverage identifies missing future evidence sources, especially richer type and data-flow analysis.
+\item Static evidence is valuable for diagnosis even when it is insufficient for final semantic certification.
+\end{keyfindingsbox}
+
+The synthesis from RQ4 is that verification should not stop at a correctness label. Evidence decomposition turns incorrect outputs into diagnosable cases: invalid syntax, target-language API misuse, suspicious data movement, partial-test disagreement, or behavior-preserving structure with wrong computation. This diagnostic view is important because future verifiers will often be used inside repair, review, or human-in-the-loop workflows where the next action matters as much as the score.
+
+\subsection{RQ5: External Validation and Calibration}
+\subsubsection{Confidence Transfers Unevenly Across Generators}
+The external Python-to-Java LLM predictions test whether EviCode's score behaves like useful confidence on authentic candidates rather than synthetic negatives. We train the static verifier on HumanEval-X evidence and evaluate it zero-shot on 7,312 LLM translations. Table~\ref{tab:llm-calibration} shows that transfer depends strongly on the generator's error distribution. DeepSeekCoder has the strongest result, with accuracy 0.271 and AUC 0.756. QwenCoder is weaker with AUC 0.641, and StarCoder has low empirical correctness and weak AUC. A verifier is therefore not only a property of the benchmark; it interacts with the kinds of mistakes a generator makes.
+
+Across all external candidates, ROC-AUC is 0.694, mean confidence is 0.180, and empirical correctness is 0.191. The closeness of mean confidence and empirical correctness is encouraging because it suggests probability signal rather than arbitrary scores. The AUC is not high enough to replace execution. The result demonstrates partial generalization under distribution shift: evidence learned from benchmark-style examples retains some ordering and calibration value on real LLM translations, but the value depends on the generator's error profile. The correct interpretation is triage: static confidence can help prioritize candidates for execution, inspection, or repair, but it should not be treated as final semantic validation.
+
+\IfFileExists{../tables/llm_external_calibration.tex}{\input{../tables/llm_external_calibration.tex}}{}
+\IfFileExists{../tables/llm_confidence_by_score.tex}{\input{../tables/llm_confidence_by_score.tex}}{}
+
+\begin{figure}[!htbp]
+  \centering
+  \IfFileExists{../figures/llm_calibration_curve.pdf}{\includegraphics[width=\linewidth]{../figures/llm_calibration_curve.pdf}}{\fbox{LLM calibration figure not yet generated}}
+  \caption{Calibration curve for EviCode confidence on real Python-to-Java LLM translations; points above the diagonal indicate underconfidence and points below it indicate overconfidence.}
+  \label{fig:llm-calibration}
+\end{figure}
+
+\subsubsection{Calibration}
+Calibration changes the use case of the verifier. Figure~\ref{fig:llm-calibration} visualizes a question that classification metrics cannot answer: whether confidence behaves like a probability. AUC asks whether correct candidates tend to receive higher scores than incorrect candidates; calibration asks whether a score of 0.8 means approximately 80\% correctness. Table~\ref{tab:llm-calibration} shows why this matters: DeepSeekCoder has empirical accuracy 0.271 and mean confidence 0.201, QwenCoder has accuracy 0.190 and mean confidence 0.248, and StarCoder has accuracy 0.091 and mean confidence 0.105. Thus the verifier is underconfident for DeepSeekCoder, overconfident for QwenCoder, and roughly calibrated in the mean for StarCoder even though StarCoder's AUC is weak. For deployment, this distinction is crucial because confidence controls resource allocation. If a system decides whether to spend full execution budget based on confidence, the score must be meaningful as a probability rather than merely as a ranking.
+
+\begin{figure}[!htbp]
+  \centering
+  \IfFileExists{../figures/llm_confidence_by_score.pdf}{\includegraphics[width=\linewidth]{../figures/llm_confidence_by_score.pdf}}{\fbox{LLM score-confidence figure not yet generated}}
+  \caption{Mean EviCode confidence for graded LLM translation outcomes, where score 1 is parsable but not compilable, score 2 is compilable but incorrect, and score 3 is functionally correct.}
+  \label{fig:llm-score-confidence}
+\end{figure}
+
+\subsubsection{Confidence Tracks a Quality Continuum}
+The graded LLM labels test whether EviCode confidence captures a quality continuum rather than only a correct/incorrect split. Table~\ref{tab:llm-score-confidence} and Figure~\ref{fig:llm-score-confidence} show confidence by outcome grade. Unusable translations receive very low mean confidence, 0.006 across 1,084 rows. Parse-only candidates rise to 0.175 across 3,104 rows, compilable-but-wrong candidates rise further to 0.226 across 1,727 rows, and functionally correct candidates receive the highest confidence, 0.270 across 1,397 rows. The monotonic trend is important even though the absolute confidences are conservative: the score tracks a quality continuum. Overall, Table~\ref{tab:llm-score-confidence} suggests that evidence-fused confidence is not merely a binary classifier output; it can represent intermediate states of generated-code quality, which is exactly what triage systems need.
+
+\begin{keyfindingsbox}{RQ5}
+\item Static evidence confidence transfers partially to real Python-to-Java LLM translations.
+\item Verifier performance depends on the generator's error distribution, not only on the benchmark.
+\item Mean confidence is close to empirical correctness, suggesting useful calibration signal.
+\item External confidence should support triage and prioritization, not replace execution.
+\end{keyfindingsbox}
+
+The synthesis from RQ5 is that evidence-fused confidence behaves differently from a binary metric. Under distribution shift, the score is not accurate enough to certify correctness, but it still preserves useful ordering and approximate calibration. This makes the confidence valuable as a triage signal: high-risk candidates can be routed to execution or repair, while higher-confidence candidates can be prioritized without hiding the uncertainty behind a hard label.
+
+\section{Metric and Language Analysis}
+Surface metrics fail for a predictable scientific reason: they observe resemblance, not behavior. Table~\ref{tab:metric-comparison} shows that BLEU and CrystalBLEU have very low F1, 0.028 and 0.022, despite moderate AUC values of 0.685 and 0.714. TF-IDF and CodeBLEU are stronger thresholded signals, with F1 0.530 and 0.559 and AUC about 0.727--0.728, but they remain far below execution F1 0.885 and EviCode All F1 0.894. This is not a weakness of implementation; it is a limitation of what the metrics can observe. A generated program may preserve many tokens while changing an operator, and a correct translation may replace many tokens because the target language uses different syntax, APIs, or idioms. Overall, Table~\ref{tab:metric-comparison} shows why conventional metrics should be interpreted as evidence sources rather than as semantic judges: they contribute partial observations, but they do not define correctness.
+
+\IfFileExists{../tables/metric_comparison.tex}{\input{../tables/metric_comparison.tex}}{}
+\IfFileExists{../tables/language_specific_rankings.tex}{\input{../tables/language_specific_rankings.tex}}{}
+
+The metric comparison is more informative than a leaderboard. BLEU performs poorly as a classifier because cross-language translation often changes keywords, punctuation, library calls, and idioms even when behavior is preserved. CodeBLEU improves because it observes code structure, but its F1 0.559 remains far below execution and all-evidence fusion. The result challenges the idea that adding structural components to a similarity metric is enough to approximate semantics. Structure-aware similarity is a useful evidence source, but it remains a proxy. Execution provides the strongest evidence in this benchmark because it observes outputs on concrete inputs, and EviCode All obtains the strongest AUC, 0.958, because it combines behavioral evidence with static evidence that refines ranking among candidates. EviCode Static is also notable: its F1 0.526 is below CodeBLEU, but its AUC 0.807 is substantially higher, reinforcing the distinction between thresholded certification and ranking. A metric's value depends on the decision it supports: similarity can rank, execution can confirm observed behavior, and evidence fusion can explain how those signals interact.
+
+Table~\ref{tab:language-rankings} adds a second caution: evidence is not language-neutral. Dynamic evidence has the highest mutual information in every target language, but the magnitude changes: Java full execution has MI 0.563, Python 0.459, and JavaScript 0.294. This spread means evidence strength is partly a property of the language and harness, not only of the feature. Token overlap is the strongest static feature in the language-specific table, but its MI remains much smaller than execution. Overall, Table~\ref{tab:language-rankings} suggests that future verification studies should report language-specific evidence behavior rather than assuming that a feature ranking learned in one language transfers unchanged to another.
+
+\IfFileExists{../tables/surprising_findings.tex}{\input{../tables/surprising_findings.tex}}{}
+
+The most memorable result is not simply that execution beats static evidence; it is that some intuitive static signals are weaker than expected. Table~\ref{tab:surprising-findings} challenges a common assumption in code intelligence: richer structural representations do not automatically approximate semantics more closely. AST node similarity has coefficient 0.006 after richer evidence is available, while operator-pattern evidence reaches 0.467. Identifier roles likewise matter more than raw names, with coefficient 0.186 versus 0.013. The example-test result is also striking: example execution reaches F1 0.879, about 97\% of the full-execution F1 0.904. Collectively, these findings suggest a design rule for future verification metrics: semantic proximity should be measured through obligations and behavior, not merely through increasingly rich structural resemblance.
+
+\begin{figure}[!htbp]
+  \centering
+  \IfFileExists{../figures/metric_comparison_matrix.pdf}{\includegraphics[width=\linewidth]{../figures/metric_comparison_matrix.pdf}}{\fbox{Metric comparison figure not yet generated}}
+  \caption{ROC-AUC comparison of lightweight similarity metrics, execution, and EviCode evidence-fusion configurations on the same HumanEval-X split; the explicit EviCode rows show the static-only and all-evidence verifier results.}
+  \label{fig:metric-comparison}
+\end{figure}
+
+Figure~\ref{fig:metric-comparison} makes the practical consequence visible. A verifier built only from surface resemblance may rank candidates somewhat better than chance, but it cannot support trust decisions on its own. BLEU and CrystalBLEU stay below F1 0.03, while CodeBLEU and TF-IDF reach roughly F1 0.56 and 0.53. EviCode Static improves the ranking view with AUC 0.807, and EviCode All is strongest with AUC 0.958 because it combines static decomposition with execution. Evidence fusion is most useful when it explains what a score is made of, because no single similarity family observes enough of the semantic space.
+
+\begin{figure}[!htbp]
+  \centering
+  \IfFileExists{../figures/language_specific_importance.pdf}{\includegraphics[width=\linewidth]{../figures/language_specific_importance.pdf}}{\fbox{Language importance figure not yet generated}}
+  \caption{Highest-ranked evidence features for each target language, showing that evidence usefulness varies across Python, Java, and JavaScript targets.}
+  \label{fig:language-importance}
+\end{figure}
+
+Figure~\ref{fig:language-importance} reinforces the language-specific result. The strongest features shift across Python, Java, and JavaScript targets because each language exposes different syntactic and API obligations. Full execution MI is highest for Java at 0.563, lower for Python at 0.459, and lowest for JavaScript at 0.294; example execution follows the same ordering at 0.474, 0.397, and 0.262. Token overlap is the leading static feature in the language table, but its MI is much smaller: 0.087 for Python, 0.072 for Java, and 0.065 for JavaScript. This means future verifiers should report target-language sensitivity rather than presenting a single feature ranking as universal.
+
+\section{Evidence Disagreement Analysis}
+Average scores answer which evidence sources are useful on average. They do not explain why evidence sources disagree. Disagreement cases reveal the boundary between similarity, structure, and behavior. Table~\ref{tab:qualitative-disagreements} reports representative cases selected from existing HumanEval-X artifacts. The examples are deliberately concrete: one wrong candidate has AST 0.957 and BLEU 0.446 but fails execution; another has CodeBLEU 0.841 and still fails tests; a correct translation has BLEU 0.000 but passes execution; and an example-pass/full-fail case shows why partial tests cannot be treated as full semantic proof. Disagreements expose the failure modes hidden by aggregate scores.
+
+\IfFileExists{../tables/qualitative_disagreements.tex}{\input{../tables/qualitative_disagreements.tex}}{}
+
+These cases teach three lessons that average metrics obscure. First, high structural similarity is not enough: task-mismatched and mutated candidates can preserve loops, returns, and broad expression shape while computing the wrong relation. Second, low lexical similarity is not necessarily bad in cross-language settings because correct translations often replace idioms, APIs, and punctuation. Third, partial execution is a budgeted signal. Passing example tests is valuable, but a verifier should treat it as evidence under a known coverage budget rather than as final correctness. Overall, Table~\ref{tab:qualitative-disagreements} shows that disagreement analysis reveals what each evidence source cannot see.
+
+\section{Statistical Validation}
+The statistical validation separates robust conclusions from close comparisons. Table~\ref{tab:bootstrap-f1} shows a large separation between Static and execution-based systems. Static reaches F1 0.454 with a 95\% interval of [0.394, 0.509], while Example execution and Static+Example both reach 0.879 [0.853, 0.904]. All and FullExec both reach 0.904 [0.879, 0.925]. The robust conclusion is therefore not a narrow ranking among execution-heavy systems; it is that behavior-observing evidence is substantially more reliable than static-only verification for final correctness decisions.
+
+The same intervals also prevent overclaiming. FullExec, All, Example execution, and Static+Example have overlapping confidence intervals, so the study should not be read as proving a large F1 difference among the execution-heavy configurations. The more careful interpretation is that once execution evidence is present, static evidence mainly improves ranking, confidence, explanation, and triage rather than producing a clearly separated F1 gain. This matches the earlier AUC result, where all-evidence fusion is strongest as a confidence-ranking mechanism even when thresholded F1 remains close to execution-only systems.
+
+The paired McNemar tests in Table~\ref{tab:mcnemar} reinforce this reading at the prediction level. Comparing Static against All yields 272 disagreements, with 234 cases correct only under All and 38 correct only under Static; the reported $p=0.000$ indicates a decisive paired difference. Example execution versus All has 21 disagreements, with 18 cases correct only under All and 3 only under Example execution, producing $p=0.001$. In contrast, FullExec versus All has no disagreements in the generated table and $p=1.000$, so the study should not claim a paired advantage between those two thresholded systems.
+
+The validation therefore supports a nuanced conclusion rather than a simple leaderboard. EviCode's evidence decomposition shows that dynamic evidence provides the strongest benchmark signal against static-only verification in these experiments, but it also shows that static evidence has a different role once dynamic evidence exists: it helps explain, rank, calibrate, and route candidates. Overall, Tables~\ref{tab:bootstrap-f1} and~\ref{tab:mcnemar} prevent overstatement. They support an evidence-centered account of verification behavior, not a claim that a fusion model statistically outperforms execution in every thresholded comparison.
+
+\IfFileExists{../tables/bootstrap_f1.tex}{\input{../tables/bootstrap_f1.tex}}{}
+\IfFileExists{../tables/mcnemar.tex}{\input{../tables/mcnemar.tex}}{}
+
+\subsection*{Synthesis Across Experimental Findings}
+Across the experimental sections, three principles emerge. First, evidence strength follows semantic proximity: signals that observe behavior are strongest for final correctness, while signals that observe form, structure, or local obligations are better suited to ranking and explanation. Second, complementarity is more important than quantity. The useful static sources are those that disagree with one another in interpretable ways, such as operator evidence exposing local computation changes that AST similarity can miss. Third, verification confidence is a resource-allocation tool. A calibrated evidence score helps decide when to accept, execute, repair, or review a generated program, especially when full execution is unavailable or expensive.
+
+These principles are stronger than a simple ordering of methods. They explain why BLEU can have nontrivial AUC but unusable F1, why AST similarity can look plausible while adding little after behavior-proximal evidence is known, why example execution has a steep early payoff, and why external confidence remains useful despite distribution shift. The results therefore support an evidence-design view of semantic verification: future systems should specify which uncertainty each signal reduces, what it costs to obtain, when it becomes redundant, and how it should affect a trust decision.
+
+\section{Discussion}
+The results point to one central lesson: semantic verification should be studied as evidence decomposition rather than as a search for a single universal metric. The hierarchy observed in this paper is an empirical characterization of HumanEval-X and the external Python-to-Java translation set, not a claim that every code domain will order evidence sources identically. The contribution is not the unsurprising observation that execution is powerful. The contribution is a formal and empirical account of what non-execution evidence contributes before execution, alongside execution, and when execution is unavailable. Static evidence is not a substitute for tests; it is a set of cheap, diagnostic observations that support ranking, routing, and explanation. The value of EviCode is that decomposed evidence makes those observations measurable instead of hiding them inside a monolithic score.
+
+\subsection{Why Execution Provides the Strongest Evidence Here}
+The strongest empirical result is also the least surprising: execution-based evidence provides the strongest signal on the evaluated benchmarks. This result anchors the interpretation of all other evidence sources. Execution observes program behavior on concrete inputs, while lexical, syntactic, and structural sources observe proxies. If a test suite exercises the relevant behavior and the runtime environment is available, execution should receive more trust than a static similarity score.
+
+The interesting question is what happens around that ideal case. Many generated-code workflows do not begin with a complete, cheap, language-matched test suite. A translation may target a language whose harness is difficult to compile. A migration candidate may depend on external services. A repair candidate may have weak regression tests. An LLM completion may be generated before the developer has written tests. In these settings, static evidence is not competing with execution; it is helping decide what deserves execution first, what is likely hopeless, and why a candidate looks suspicious.
+
+The example-test result is particularly important. It shows that even a small amount of execution can be highly informative on HumanEval-X. This should not be overgeneralized into a claim that one example test is enough in real systems. Instead, it clarifies the shape of the trade-off: dynamic evidence has a steep early payoff, and static evidence becomes most useful when it can accompany that payoff with explanation and prioritization. A practical verifier might therefore execute a small cheap test set first, then use static evidence to decide which surviving candidates deserve full execution or human review.
+
+\subsection{Which Static Evidence Should Survive}
+Static evidence improves over raw textual similarity when it exposes a failure mode that another cheap signal cannot see. Syntax evidence separates malformed candidates from deeper failures. AST evidence distinguishes broad organizational similarity from token coincidence. Operator evidence catches local computational changes hidden inside similar syntax. API evidence identifies target-language misuse. Identifier-role and data-flow evidence point to suspicious value responsibilities. The lesson is selective retention: future verifiers should keep static evidence sources because they explain distinct failure modes, not because they increase feature count.
+
+The results also show why static evidence should be described carefully. Enriched static evidence is useful, but it does not replace dynamic evidence. This distinction matters for software engineering practice. A static verifier can be valuable even when its F1 is far below full execution, because the operational question is often routing rather than certification. If a system can cheaply reject clearly invalid candidates, rank remaining candidates, and identify likely API or identifier problems, it reduces the burden on expensive execution and human review.
+
+This also explains why CodeBLEU behaves the way it does. CodeBLEU is stronger than BLEU because it observes more than token overlap. It partially recognizes that programs have syntax and data-flow-like structure. But it remains a metric over representations, not an explanation of which evidence source supported the decision. It can reward a candidate whose tree resembles the reference while missing that the candidate calls the wrong API, swaps a role, or fails a test. EviCode's static verifier has the same fundamental limitation, but the decomposition makes the limitation visible.
+
+\subsection{Why AST Evidence Contributes Less After Richer Evidence}
+AST similarity is intuitively appealing because programs are structured. However, the experiments and examples explain why structure alone can disappoint. Many wrong translations preserve shape: changing \texttt{+} to \texttt{-}, flipping a comparison, swapping arguments, or calling the wrong API can leave the tree nearly unchanged. Conversely, many correct translations change shape: a loop becomes a library call, recursion becomes iteration, or a guard clause becomes a combined condition.
+
+This does not make AST evidence useless. It means AST evidence is best interpreted as an alignment signal. It tells us whether two programs have comparable organization. It should be paired with operator, API, data-flow, and execution evidence before a verifier treats structural similarity as semantic confidence.
+
+The coefficient analysis makes this point concrete. AST node similarity contributes relatively little in the transparent fusion model once richer evidence sources are available, while operator-pattern evidence is much stronger. That result is a useful surprise. It suggests that future code metrics should be careful about treating AST overlap as inherently semantic. The tree provides a scaffold; in these experiments, much of the behavior-relevant signal lives in the operators, calls, predicates, and value roles attached to that scaffold.
+
+\subsection{Why Identifiers and APIs Are Surprisingly Useful}
+Identifier and API evidence may seem shallow because names can be arbitrary. In generated-code verification, however, names often encode roles. Parameters such as \texttt{nums}, \texttt{target}, \texttt{left}, and \texttt{right} provide clues about value flow. API calls encode assumptions about libraries, data structures, and target-language idioms. A candidate with valid syntax but an invalid method call is not merely stylistically different; it may be unusable.
+
+The main caution is that these signals are asymmetric. Literal identifier preservation is not required for correctness, especially across languages. API changes may be necessary in translation. The useful evidence is not ``same names are good''; it is ``roles and library obligations should remain coherent.'' Future verifiers should model this distinction more explicitly, for example by comparing identifier roles rather than raw strings.
+
+The difference between raw identifier overlap and identifier-role evidence is another memorable result. Raw name overlap is fragile: a correct Java translation may rename variables, introduce loop indices, or replace Pythonic names with target-language idioms. Role evidence asks a more semantic question: do the variables that look like inputs, accumulators, loop indices, and returns play compatible roles? That is still an approximation, but it is closer to how developers read translated code.
+
+\subsection{Complementarity and Redundancy}
+Evidence decomposition lets us separate two questions that monolithic metrics conflate. A source may be informative by itself but redundant once another source is known. Example-test execution and full-test execution are likely to be correlated because they observe related behavior, although full tests provide broader coverage. Lexical and AST evidence can also be correlated when similar code preserves similar structure.
+
+Complementary evidence is more valuable than merely numerous evidence. API evidence can catch a failure that AST shape misses. Operator evidence can catch a small semantic change hidden inside high lexical overlap. Identifier-role evidence can flag value swaps that raw name overlap hides. Execution can adjudicate cases where static evidence disagrees. This suggests that future metrics should report not only aggregate accuracy but also which evidence sources contributed unique information.
+
+Disagreement analysis is the natural next step after ablation. Ablation asks whether a source helps the final model. Disagreement asks what kind of mistake the source makes. Lexical-high/execution-low cases reveal surface mimicry. AST-high/execution-low cases reveal structurally plausible wrong programs. Execution-low/static-high cases often reveal the limits of tests, compilers, or environment assumptions. Static-low/execution-high cases remind us that correct programs can be unfamiliar. These disagreements are not noise around the main result; they are the main route to understanding semantic verification.
+
+\subsection{Calibration Changes the Use Case}
+A binary verifier answers whether a candidate crosses a threshold. A calibrated verifier supports decisions under resource constraints. If confidence is meaningful, a downstream system can execute only uncertain or high-value candidates, route low-confidence candidates to repair, and send ambiguous cases to human review. The external LLM translation experiment is therefore important even though static confidence is not perfect. Mean confidence is close to empirical correctness, indicating useful probability signal, while high-confidence overconfidence identifies where the model should be treated cautiously.
+
+This is a different contribution from claiming a new state-of-the-art classifier. The confidence score is valuable because it exposes uncertainty. For generated code, uncertainty is not a nuisance; it is a resource-allocation signal.
+
+\subsection{What Future Metrics Should Include}
+The evidence view suggests several design principles. First, metrics should state what they observe: tokens, syntax, structure, APIs, data flow, tests, or learned correlations. Second, metrics with execution should report test strength and availability, not just pass rate. Third, learned evaluators should report calibration in addition to accuracy. Fourth, evidence sources should be ablated so the community can tell whether a metric works because it observes behavior, structure, dataset artifacts, or superficial overlap.
+
+The broader lesson is that semantic verification is not a single measurement problem. It is an evidence-integration problem under cost and availability constraints. EviCode's empirical results are one instantiation of that view; the framework is intended to make future verification systems easier to analyze, compare, and trust.
+
+For benchmark designers, this means releasing more than labels. A useful verification benchmark should expose tests, partial-test budgets, compilation outcomes, parser outcomes, and enough metadata to study why metrics disagree. For metric designers, this means separating scoring from explanation. A future metric that achieves high AUC but cannot say whether it used lexical mimicry, structural alignment, execution, or dataset artifacts will be difficult to trust. For tool builders, this means verification should be staged: cheap evidence first, execution when available, and explanation throughout.
+
+\section{Guidelines}
+The evidence study yields practical design rules for future verification metrics. Table~\ref{tab:metric-guidelines} summarizes these guidelines, but the broader message is that metrics should be explicit about what they can observe. A metric based only on text should not be presented as semantic correctness. A metric with execution should report test strength. A learned verifier should report calibration, not only classification accuracy.
+
+Each guideline follows directly from a result. "Use execution when available" follows from the F1 and paired-test separation between static and dynamic evidence. "Combine static evidence" follows from the static AUC and explanation analyses, which show value for ranking and triage even when F1 is lower. "Treat examples as incomplete" follows from the gap between example and full execution and the disagreement cases. "Report cost and availability" follows from the unsupported weak-test budgets and the practical cost of runtime evidence. "Avoid lexical-only claims" follows from BLEU's extremely low F1 despite nontrivial AUC.
+
+\IfFileExists{../tables/metric_design_guidelines.tex}{\input{../tables/metric_design_guidelines.tex}}{}
+
+\section{Threats to Validity}
+\textbf{Construct validity.} HumanEval-X correctness and external score labels approximate semantic correctness through tests. Passing tests is not full equivalence, and failing tests may reflect harness issues. Static evidence features are approximations rather than formal analyses.
+
+\textbf{Internal validity.} Negative HumanEval-X examples are created by mismatch and mutation, which may make some failures easier than real model errors. Grouped problem-level splits reduce leakage across tasks, but feature extraction bugs or parser limitations could affect results.
+
+\textbf{External validity.} The main benchmark covers Python, Java, and JavaScript HumanEval-X tasks, while external validation currently covers Python-to-Java CodeNet-style translations. Results may differ for larger systems, interactive programs, domain-specific APIs, or languages with different type and runtime behavior.
+
+\textbf{Conclusion validity.} The study uses bootstrap intervals and McNemar tests, but some comparisons remain exploratory. Coefficient magnitude is an interpretability aid, not a causal estimate. Cost estimates are approximate.
+
+\textbf{Ecological validity.} Real development workflows involve human review, build systems, dependencies, and evolving requirements. EviCode models the verification core, not the full socio-technical workflow.
+
+\section{Conclusion}
+Semantic verification of machine-generated code is difficult because no single cheap observation captures behavior. Textual similarity is useful but shallow; static structure is richer but approximate; execution is powerful but availability-limited. The central lesson of this study is that, in the evaluated settings, different evidence sources fail in different, diagnosable ways: AST shape can preserve the wrong computation, identifier strings can be less informative than identifier roles, CodeBLEU can reward structural plausibility without observing behavior, and small execution budgets can provide strong but incomplete evidence.
+
+Rather than proposing yet another verification metric, this work argues that semantic verification should be viewed as an evidence integration problem. By exposing and quantifying individual evidence sources, EviCode provides a foundation for designing future verification metrics that are interpretable, cost-aware, calibrated, and grounded in the semantics they claim to measure. Future progress should therefore be judged not only by higher scores, but by clearer answers to a deeper question: why should we believe this generated program is correct?
+
+\bibliographystyle{IEEEtran}
+\bibliography{references}
+
+\appendices
+\section{Reproducibility Checklist}
+The repository includes dependency manifests, setup documentation, resume-safe progress files, unit tests, benchmark outputs, external LLM confidence outputs, analysis outputs, generated tables and figures, and a reproducible paper build path.
+
+\end{document}
+

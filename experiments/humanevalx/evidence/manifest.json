@@ -1,0 +1,10 @@
+{
+  "budgets": [
+    "none",
+    "example",
+    "full"
+  ],
+  "num_examples": 2952,
+  "partial": false,
+  "total_examples": 2952
+}

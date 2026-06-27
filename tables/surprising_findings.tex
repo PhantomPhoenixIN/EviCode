@@ -1,0 +1,20 @@
+\begin{table*}[!t]
+\centering
+\small
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lll}
+\toprule
+Finding & Result & Lesson \\
+\midrule
+AST is weak after richer evidence & AST node coefficient 0.006; operator-pattern coefficient 0.467. & Tree shape can preserve the wrong computation. \\
+Roles beat raw names & Role coefficient 0.186; raw-name coefficient 0.013. & Names help most when they encode data roles. \\
+Example tests are strong & Example F1 0.879; full-execution F1 0.904; ratio 0.97. & A small dynamic signal has high early payoff. \\
+Fusion refines ranking & All-evidence AUC 0.958; full-execution AUC 0.947. & Static evidence can refine confidence. \\
+CodeBLEU is incomplete & CodeBLEU F1 0.559; EviCode static AUC 0.807. & Structure-aware similarity still misses behavior. \\
+\bottomrule
+\end{tabular}
+}
+\vspace{0.5em}
+\caption{Interpretive findings that turn aggregate results into scientific lessons about verification evidence.}
+\label{tab:surprising-findings}
+\end{table*}

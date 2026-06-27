@@ -1,0 +1,25 @@
+\begin{table}[!htbp]
+\centering
+\small
+\begin{tabular}{lrrrr}
+\toprule
+System & Acc. & F1 & AUC & Feat. \\
+\midrule
+FullExec & 0.929 & 0.904 & 0.947 & 1 \\
+All & 0.923 & 0.894 & 0.958 & 23 \\
+Static+Full & 0.920 & 0.889 & 0.957 & 22 \\
+Ex. & 0.912 & 0.879 & 0.924 & 1 \\
+Static+Ex. & 0.908 & 0.873 & 0.934 & 22 \\
+Static & 0.738 & 0.526 & 0.807 & 21 \\
+Ident. & 0.668 & 0.251 & 0.713 & 1 \\
+Retr. & 0.669 & 0.195 & 0.616 & 1 \\
+Syntax & 0.667 & 0.000 & 0.589 & 1 \\
+API & 0.667 & 0.000 & 0.588 & 1 \\
+AST & 0.667 & 0.000 & 0.547 & 1 \\
+CFG & 0.667 & 0.000 & 0.616 & 1 \\
+\bottomrule
+\end{tabular}
+\vspace{0.5em}
+\caption{Main HumanEval-X verification results comparing static, dynamic, and fused evidence configurations.}
+\label{tab:main-results}
+\end{table}

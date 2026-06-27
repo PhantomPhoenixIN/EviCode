@@ -1,0 +1,19 @@
+\begin{table}[!htbp]
+\centering
+\small
+\begin{tabular}{lrrrl}
+\toprule
+Evidence & Sec. & MI & MI/ms & Cost \\
+\midrule
+Full execution & 0.010 & 0.409 & 0.041 & high \\
+Example execution & 0.010 & 0.356 & 0.036 & high \\
+Token overlap & 0.000 & 0.109 & 1.110 & low \\
+AST node similarity & 0.000 & 0.108 & 1.105 & low \\
+Condition/operator patterns & 0.000 & 0.069 & 0.705 & low \\
+Identifier overlap & 0.000 & 0.059 & 0.596 & low \\
+\bottomrule
+\end{tabular}
+\vspace{0.5em}
+\caption{Cost-normalized evidence summary showing extraction time, informativeness, and mutual information per millisecond where label information is available.}
+\label{tab:evidence-costs}
+\end{table}

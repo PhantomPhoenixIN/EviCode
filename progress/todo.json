@@ -1,0 +1,14 @@
+{
+  "todo": [
+    "Initialize Git repository.",
+    "Implement HumanEval-X downloader.",
+    "Implement HumanEval-X dataset builder.",
+    "Implement rich AST evidence.",
+    "Implement CFG evidence.",
+    "Implement API consistency evidence.",
+    "Implement identifier mapping evidence.",
+    "Implement retrieval evidence.",
+    "Implement execution evidence budgets.",
+    "Implement evidence contribution analysis."
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "accuracy": 1.0,
+  "num_evidence_sources": 7,
+  "num_examples": 4,
+  "report_path": "experiments\\smoke\\verification_reports.json",
+  "roc_auc": 1.0
+}

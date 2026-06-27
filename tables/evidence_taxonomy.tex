@@ -1,0 +1,25 @@
+\begin{table}[!htbp]
+\centering
+\small
+\begin{tabular}{lll}
+\toprule
+Evidence & Category & Cost \\
+\midrule
+Token overlap & Lexical & low \\
+Edit similarity & Lexical & low \\
+Length ratio & Lexical & low \\
+Parse validity & Syntactic & low \\
+AST node similarity & Syntactic & medium \\
+AST depth similarity & Syntactic & medium \\
+AST shape similarity & Syntactic & medium \\
+Control flow & Structural & low \\
+Nesting depth & Structural & low \\
+Condition/operator patterns & Structural & low \\
+API overlap & Semantic-static & low \\
+API mismatch & Semantic-static & low \\
+\bottomrule
+\end{tabular}
+\vspace{0.5em}
+\caption{EviCode evidence taxonomy, organized by source type so that syntax, structure, API, identifier, retrieval, and execution evidence can be studied separately.}
+\label{tab:evidence-taxonomy}
+\end{table}

@@ -1,0 +1,34 @@
+\begin{table}[!htbp]
+\centering
+\small
+\begin{tabular}{lrrr}
+\toprule
+Removed & Acc. & F1 & AUC \\
+\midrule
+Ident. & 0.738 & 0.530 & 0.804 \\
+Retr. & 0.738 & 0.526 & 0.807 \\
+call\_similarity & 0.738 & 0.526 & 0.807 \\
+edit\_similarity & 0.738 & 0.526 & 0.807 \\
+AST & 0.734 & 0.525 & 0.805 \\
+loop\_count\_similarity & 0.733 & 0.524 & 0.808 \\
+ast\_depth\_similarity & 0.737 & 0.523 & 0.809 \\
+branch\_count\_similarity & 0.738 & 0.522 & 0.807 \\
+return\_count\_similarity & 0.740 & 0.520 & 0.806 \\
+type\_similarity & 0.736 & 0.520 & 0.807 \\
+Length & 0.737 & 0.517 & 0.813 \\
+CFG & 0.733 & 0.514 & 0.807 \\
+API & 0.732 & 0.513 & 0.806 \\
+data\_flow\_similarity & 0.733 & 0.512 & 0.808 \\
+api\_mismatch\_score & 0.733 & 0.512 & 0.806 \\
+nesting\_depth\_similarity & 0.733 & 0.510 & 0.808 \\
+ast\_shape\_similarity & 0.734 & 0.509 & 0.806 \\
+identifier\_role\_similarity & 0.731 & 0.506 & 0.805 \\
+token\_jaccard & 0.724 & 0.494 & 0.799 \\
+operator\_pattern\_similarity & 0.714 & 0.474 & 0.812 \\
+Syntax & 0.701 & 0.411 & 0.729 \\
+\bottomrule
+\end{tabular}
+\vspace{0.5em}
+\caption{Leave-one-out ablation over static evidence features, measuring how much each feature family contributes to static-only verification.}
+\label{tab:static-ablation}
+\end{table}
