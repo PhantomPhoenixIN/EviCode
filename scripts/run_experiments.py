@@ -26,37 +26,25 @@ from evicode.utils.cli import add_common_args  # noqa: E402
 from evicode.utils.progress import mark_stage, write_json  # noqa: E402
 
 
-STATIC_FEATURES = [
-    "token_jaccard",
-    "edit_similarity",
-    "length_ratio",
-    "syntax_proxy",
-    "ast_similarity",
-    "ast_depth_similarity",
-    "ast_shape_similarity",
-    "control_flow_similarity",
-    "branch_count_similarity",
-    "loop_count_similarity",
-    "return_count_similarity",
-    "nesting_depth_similarity",
-    "operator_pattern_similarity",
-    "api_similarity",
-    "call_similarity",
-    "api_mismatch_score",
-    "identifier_similarity",
-    "identifier_role_similarity",
-    "data_flow_similarity",
-    "type_similarity",
-    "retrieval_similarity",
+CATEGORIES = feature_to_category()
+STATIC_FEATURES = [feature for feature, category in CATEGORIES.items() if category != "Dynamic"]
+LANGUAGE_NORMALIZED_FEATURES = [
+    feature for feature, category in CATEGORIES.items() if category.startswith("Normalized")
 ]
+WEAK_PROXY_FEATURES = [feature for feature, category in CATEGORIES.items() if category == "Weak-proxy"]
 
 CATEGORY_FEATURES = {
     category.lower().replace("-", "_"): [
-        feature for feature, feature_category in feature_to_category().items() if feature_category == category
+        feature for feature, feature_category in CATEGORIES.items() if feature_category == category
     ]
-    for category in sorted(set(feature_to_category().values()))
+    for category in sorted(set(CATEGORIES.values()))
 }
 CATEGORY_FEATURES.pop("dynamic", None)
+
+
+def cat(name: str) -> list[str]:
+    """Return a category feature list if present."""
+    return CATEGORY_FEATURES.get(name, [])
 
 FEATURE_SETS = {
     "syntax_only": ["syntax_proxy"],
@@ -66,10 +54,18 @@ FEATURE_SETS = {
     "identifier_only": ["identifier_similarity"],
     "retrieval_only": ["retrieval_similarity"],
     "static_only": STATIC_FEATURES,
-    "lexical_only": CATEGORY_FEATURES["lexical"],
-    "syntactic_only": CATEGORY_FEATURES["syntactic"],
-    "structural_only": CATEGORY_FEATURES["structural"],
-    "semantic_static_only": CATEGORY_FEATURES["semantic_static"],
+    "language_normalized_only": LANGUAGE_NORMALIZED_FEATURES,
+    "weak_proxy_only": WEAK_PROXY_FEATURES,
+    "lexical_only": cat("lexical"),
+    "syntactic_only": cat("syntactic"),
+    "structural_only": cat("normalized_control") + cat("normalized_structure") + cat("normalized_operator"),
+    "semantic_static_only": cat("semantic_static") + cat("normalized_identifier") + cat("normalized_dataflow") + cat("normalized_call"),
+    "normalized_control_only": cat("normalized_control"),
+    "normalized_structure_only": cat("normalized_structure"),
+    "normalized_operator_only": cat("normalized_operator"),
+    "normalized_identifier_only": cat("normalized_identifier"),
+    "normalized_dataflow_only": cat("normalized_dataflow"),
+    "normalized_call_only": cat("normalized_call"),
     "execution_example_only": ["execution_passed_example"],
     "execution_full_only": ["execution_passed_full"],
     "dynamic_only": ["execution_passed_example", "execution_passed_full"],
@@ -145,6 +141,8 @@ def main() -> int:
     metrics = []
     predictions = []
     for name, features in FEATURE_SETS.items():
+        if not features:
+            continue
         x = frame[features].fillna(0.0).to_numpy(dtype=float)
         model = make_pipeline(
             StandardScaler(),

@@ -1,16 +1,16 @@
 \begin{table}[!htbp]
 \centering
-\small
+\scriptsize
 \begin{tabular}{llrr}
 \toprule
 Evidence & Category & AUC & MI \\
 \midrule
-Full execution & Dynamic & 0.934 & 0.409 \\
-Example execution & Dynamic & 0.913 & 0.356 \\
-Token overlap & Lexical & 0.739 & 0.109 \\
-AST node similarity & Syntactic & 0.550 & 0.108 \\
-Condition/operator patterns & Structural & 0.633 & 0.069 \\
-Identifier overlap & Semantic-static & 0.709 & 0.059 \\
+Full execution & Dynamic & 0.934 & 0.411 \\
+Example execution & Dynamic & 0.913 & 0.361 \\
+AST node similarity & Weak-proxy & 0.550 & 0.109 \\
+Token overlap & Weak-proxy & 0.739 & 0.097 \\
+Condition/operator patterns & Normalized-operator & 0.633 & 0.069 \\
+Identifier overlap & Semantic-static & 0.709 & 0.053 \\
 \bottomrule
 \end{tabular}
 \vspace{0.5em}

@@ -69,7 +69,17 @@ def test_select_test_budget() -> None:
 def test_evidence_taxonomy_has_expected_groups() -> None:
     """The explicit taxonomy should expose the main evidence groups."""
     categories = {row["category"] for row in taxonomy_rows()}
-    assert {"Lexical", "Syntactic", "Structural", "Semantic-static", "Dynamic"} <= categories
+    assert {
+        "Weak-proxy",
+        "Normalized-program",
+        "Normalized-control",
+        "Normalized-structure",
+        "Normalized-operator",
+        "Normalized-identifier",
+        "Normalized-dataflow",
+        "Dynamic",
+    } <= categories
     mapping = feature_to_category()
-    assert mapping["token_jaccard"] == "Lexical"
+    assert mapping["token_jaccard"] == "Weak-proxy"
+    assert mapping["ln_operator_family_similarity"] == "Normalized-operator"
     assert mapping["execution_passed_full"] == "Dynamic"

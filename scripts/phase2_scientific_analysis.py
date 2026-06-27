@@ -32,11 +32,43 @@ from evicode.utils.progress import mark_stage, write_json  # noqa: E402
 
 
 HIERARCHY = [
-    ("L1_lexical", ["Lexical"]),
-    ("L2_syntactic", ["Lexical", "Syntactic"]),
-    ("L3_structural", ["Lexical", "Syntactic", "Structural"]),
-    ("L4_behavioral_static", ["Lexical", "Syntactic", "Structural", "Semantic-static"]),
-    ("L5_dynamic", ["Lexical", "Syntactic", "Structural", "Semantic-static", "Dynamic"]),
+    ("L1_weak_proxy", ["Weak-proxy", "Lexical", "Syntactic"]),
+    ("L2_normalized_program", ["Weak-proxy", "Lexical", "Syntactic", "Normalized-program"]),
+    ("L3_normalized_control_structure", [
+        "Weak-proxy",
+        "Lexical",
+        "Syntactic",
+        "Normalized-program",
+        "Normalized-control",
+        "Normalized-structure",
+    ]),
+    ("L4_normalized_semantic_static", [
+        "Weak-proxy",
+        "Lexical",
+        "Syntactic",
+        "Normalized-program",
+        "Normalized-control",
+        "Normalized-structure",
+        "Normalized-operator",
+        "Normalized-identifier",
+        "Normalized-dataflow",
+        "Normalized-call",
+        "Semantic-static",
+    ]),
+    ("L5_dynamic", [
+        "Weak-proxy",
+        "Lexical",
+        "Syntactic",
+        "Normalized-program",
+        "Normalized-control",
+        "Normalized-structure",
+        "Normalized-operator",
+        "Normalized-identifier",
+        "Normalized-dataflow",
+        "Normalized-call",
+        "Semantic-static",
+        "Dynamic",
+    ]),
 ]
 
 

@@ -142,6 +142,17 @@ def scalar_similarity(a: int | float, b: int | float) -> float:
     return min(float(a), float(b)) / max(float(a), float(b), 1.0)
 
 
+def entropy(items: Iterable[str]) -> float:
+    """Compute normalized Shannon entropy for a sequence of symbols."""
+    values = list(items)
+    if not values:
+        return 0.0
+    counts = Counter(values)
+    total = len(values)
+    raw = -sum((count / total) * math.log2(count / total) for count in counts.values())
+    return raw / max(math.log2(len(counts)), 1.0)
+
+
 def nesting_depth(code: str, language: str) -> int:
     """Approximate control nesting depth from braces or Python indentation."""
     if language.lower() == "python":
@@ -174,6 +185,17 @@ def operator_counter(code: str) -> Counter[str]:
         "and": r"\band\b|&&",
         "or": r"\bor\b|\|\|",
         "not": r"\bnot\b|!",
+    }
+    return Counter({name: len(re.findall(pattern, code)) for name, pattern in patterns.items()})
+
+
+def operator_family_counter(code: str) -> Counter[str]:
+    """Count language-normalized operator families."""
+    patterns = {
+        "arithmetic": r"\+|-|\*|/|%",
+        "comparison": r"==|===|!=|!==|<=|>=|(?<!<)<(?![=<])|(?<!>)>(?![=>])",
+        "logical": r"\band\b|\bor\b|\bnot\b|&&|\|\||!",
+        "assignment": r"(?<![=!<>])=(?!=)|\+=|-=|\*=|/=|%=",
     }
     return Counter({name: len(re.findall(pattern, code)) for name, pattern in patterns.items()})
 
@@ -214,6 +236,162 @@ def type_tokens(code: str) -> set[str]:
     return {token.lower() for token in tokens | set(py_types)}
 
 
+def statement_distribution(code: str, language: str) -> Counter[str]:
+    """Extract a language-normalized statement distribution."""
+    lowered = code.lower()
+    dist = Counter()
+    dist["branch"] = counter_for_terms(lowered, ["if", "elif", "else", "switch", "case"])
+    dist["loop"] = counter_for_terms(lowered, ["for", "while", "do"])
+    dist["return"] = counter_for_terms(lowered, ["return"])
+    dist["exception"] = counter_for_terms(lowered, ["try", "catch", "except", "finally", "throw"])
+    dist["assignment"] = len(re.findall(r"(?<![=!<>])=(?!=)", code))
+    if language.lower() == "python":
+        dist["function"] = counter_for_terms(lowered, ["def"])
+        dist["class"] = counter_for_terms(lowered, ["class"])
+    else:
+        dist["function"] = len(re.findall(r"\b(?:public|private|protected|static|\w+)\s+[\w<>\[\]]+\s+\w+\s*\(", code))
+        dist["class"] = counter_for_terms(lowered, ["class", "interface"])
+    return dist
+
+
+def expression_distribution(code: str) -> Counter[str]:
+    """Extract a language-normalized expression distribution."""
+    return Counter(
+        {
+            "calls": len(call_tokens(code)),
+            "operators": sum(operator_family_counter(code).values()),
+            "literals": len(re.findall(r"\b\d+(?:\.\d+)?\b|\"[^\"]*\"|'[^']*'", code)),
+            "indexing": len(re.findall(r"\[[^\]]+\]", code)),
+            "attribute_access": len(re.findall(r"\.[A-Za-z_][A-Za-z0-9_]*", code)),
+        }
+    )
+
+
+def read_write_counts(code: str) -> tuple[int, int]:
+    """Approximate read/write counts from identifiers and assignments."""
+    writes = len(re.findall(r"\b([A-Za-z_][A-Za-z0-9_]*)\s*=", code))
+    reads = len(identifiers(code))
+    return reads, writes
+
+
+def program_profile(code: str, language: str) -> dict[str, float | Counter[str]]:
+    """Extract language-normalized program properties from one program.
+
+    The returned profile intentionally avoids raw parser node names as primary
+    evidence. It maps each language into comparable counts and distributions:
+    control flow, operator families, statements, expressions, calls, identifiers,
+    and approximate data-flow density.
+    """
+    valid, ast_counts, ast_depth, depth_counts = tree_sitter_counts(code, language)
+    statements = statement_distribution(code, language)
+    expressions = expression_distribution(code)
+    ids = identifiers(code)
+    calls = call_tokens(code)
+    roles = identifier_roles(code)
+    pairs = data_flow_pairs(code)
+    source_lines = [line for line in code.splitlines() if line.strip()]
+    reads, writes = read_write_counts(code)
+    branch_count = statements["branch"]
+    loop_count = statements["loop"]
+    function_count = statements["function"]
+    class_count = statements["class"]
+    return {
+        "syntax_valid": float(valid),
+        "cfg_nodes": float(branch_count + loop_count + statements["return"] + statements["exception"] + 1),
+        "cfg_edges": float(branch_count * 2 + loop_count * 2 + statements["return"] + statements["exception"]),
+        "cyclomatic_complexity": float(branch_count + loop_count + 1),
+        "branch_count": float(branch_count),
+        "loop_count": float(loop_count),
+        "return_count": float(statements["return"]),
+        "exception_count": float(statements["exception"]),
+        "function_count": float(function_count),
+        "class_count": float(class_count),
+        "max_ast_depth": float(ast_depth),
+        "avg_tree_depth": sum(int(depth) * count for depth, count in depth_counts.items()) / max(sum(depth_counts.values()), 1),
+        "branching_factor": sum(ast_counts.values()) / max(sum(depth_counts.values()), 1),
+        "nesting_depth": float(nesting_depth(code, language)),
+        "call_count": float(len(calls)),
+        "identifier_count": float(len(ids)),
+        "identifier_entropy": entropy(ids),
+        "identifier_role_count": float(len(roles)),
+        "def_use_count": float(len(pairs)),
+        "read_write_ratio": float(reads / max(writes, 1)),
+        "assignment_density": float(writes / max(len(source_lines), 1)),
+        "statement_density": float(sum(statements.values()) / max(len(source_lines), 1)),
+        "expression_density": float(sum(expressions.values()) / max(len(source_lines), 1)),
+        "operator_families": operator_family_counter(code),
+        "statements": statements,
+        "expressions": expressions,
+        "identifier_roles": Counter(role.split(":", 1)[0] for role in roles),
+    }
+
+
+def profile_similarity_features(source_profile: dict, target_profile: dict) -> dict[str, float]:
+    """Compare two language-normalized program profiles."""
+    scalar_keys = [
+        "cfg_nodes",
+        "cfg_edges",
+        "cyclomatic_complexity",
+        "branch_count",
+        "loop_count",
+        "return_count",
+        "exception_count",
+        "function_count",
+        "class_count",
+        "max_ast_depth",
+        "avg_tree_depth",
+        "branching_factor",
+        "nesting_depth",
+        "call_count",
+        "identifier_count",
+        "identifier_entropy",
+        "identifier_role_count",
+        "def_use_count",
+        "read_write_ratio",
+        "assignment_density",
+        "statement_density",
+        "expression_density",
+    ]
+    features = {
+        f"ln_{key}_similarity": scalar_similarity(source_profile[key], target_profile[key])
+        for key in scalar_keys
+    }
+    features.update(
+        {
+            "ln_syntax_both_valid": float(source_profile["syntax_valid"] and target_profile["syntax_valid"]),
+            "ln_operator_family_similarity": cosine_counter(
+                source_profile["operator_families"], target_profile["operator_families"]
+            ),
+            "ln_statement_distribution_similarity": cosine_counter(source_profile["statements"], target_profile["statements"]),
+            "ln_expression_distribution_similarity": cosine_counter(
+                source_profile["expressions"], target_profile["expressions"]
+            ),
+            "ln_identifier_role_distribution_similarity": cosine_counter(
+                source_profile["identifier_roles"], target_profile["identifier_roles"]
+            ),
+        }
+    )
+    features["ln_control_profile_similarity"] = cosine_counter(
+        Counter(
+            {
+                "branch": source_profile["branch_count"],
+                "loop": source_profile["loop_count"],
+                "return": source_profile["return_count"],
+                "exception": source_profile["exception_count"],
+            }
+        ),
+        Counter(
+            {
+                "branch": target_profile["branch_count"],
+                "loop": target_profile["loop_count"],
+                "return": target_profile["return_count"],
+                "exception": target_profile["exception_count"],
+            }
+        ),
+    )
+    return features
+
+
 def static_features(source_code: str, target_code: str, source_language: str, target_language: str) -> dict[str, float]:
     """Extract static evidence features for one code pair."""
     source_ids = identifiers(source_code)
@@ -229,6 +407,8 @@ def static_features(source_code: str, target_code: str, source_language: str, ta
         ast_sim = cosine_counter(python_ast_counts(source_code), python_ast_counts(target_code))
     if ast_sim == 0.0:
         ast_sim = cosine_counter(lexical_counts(source_code), lexical_counts(target_code))
+    source_profile = program_profile(source_code, source_language)
+    target_profile = program_profile(target_code, target_language)
     return {
         "syntax_proxy": float(source_valid and target_valid),
         "source_syntax_valid": float(source_valid),
@@ -257,4 +437,5 @@ def static_features(source_code: str, target_code: str, source_language: str, ta
         "source_length": float(len(source_code)),
         "target_length": float(len(target_code)),
         "length_ratio": min(len(source_code), len(target_code)) / max(len(source_code), len(target_code), 1),
+        **profile_similarity_features(source_profile, target_profile),
     }

@@ -1,31 +1,55 @@
 \begin{table}[!htbp]
 \centering
-\small
+\scriptsize
 \begin{tabular}{lrrr}
 \toprule
 Removed & Acc. & F1 & AUC \\
 \midrule
-Ident. & 0.738 & 0.530 & 0.804 \\
-Retr. & 0.738 & 0.526 & 0.807 \\
-call\_similarity & 0.738 & 0.526 & 0.807 \\
-edit\_similarity & 0.738 & 0.526 & 0.807 \\
-AST & 0.734 & 0.525 & 0.805 \\
-loop\_count\_similarity & 0.733 & 0.524 & 0.808 \\
-ast\_depth\_similarity & 0.737 & 0.523 & 0.809 \\
-branch\_count\_similarity & 0.738 & 0.522 & 0.807 \\
-return\_count\_similarity & 0.740 & 0.520 & 0.806 \\
-type\_similarity & 0.736 & 0.520 & 0.807 \\
-Length & 0.737 & 0.517 & 0.813 \\
-CFG & 0.733 & 0.514 & 0.807 \\
-API & 0.732 & 0.513 & 0.806 \\
-data\_flow\_similarity & 0.733 & 0.512 & 0.808 \\
-api\_mismatch\_score & 0.733 & 0.512 & 0.806 \\
-nesting\_depth\_similarity & 0.733 & 0.510 & 0.808 \\
-ast\_shape\_similarity & 0.734 & 0.509 & 0.806 \\
-identifier\_role\_similarity & 0.731 & 0.506 & 0.805 \\
-token\_jaccard & 0.724 & 0.494 & 0.799 \\
-operator\_pattern\_similarity & 0.714 & 0.474 & 0.812 \\
-Syntax & 0.701 & 0.411 & 0.729 \\
+API & 0.747 & 0.568 & 0.801 \\
+ln\_loop\_count\_similarity & 0.744 & 0.568 & 0.802 \\
+ln\_call\_count\_similarity & 0.746 & 0.567 & 0.802 \\
+ln\_expression\_distribution\_similarity & 0.746 & 0.567 & 0.801 \\
+ln\_identifier\_entropy\_similarity & 0.744 & 0.564 & 0.803 \\
+ln\_cfg\_nodes\_similarity & 0.744 & 0.563 & 0.801 \\
+ln\_avg\_tree\_depth\_similarity & 0.743 & 0.560 & 0.800 \\
+data\_flow\_similarity & 0.741 & 0.560 & 0.800 \\
+ln\_expression\_density\_similarity & 0.744 & 0.559 & 0.801 \\
+ln\_function\_count\_similarity & 0.742 & 0.559 & 0.801 \\
+ln\_identifier\_role\_count\_similarity & 0.743 & 0.558 & 0.801 \\
+Ident. & 0.743 & 0.558 & 0.800 \\
+Retr. & 0.743 & 0.558 & 0.801 \\
+ln\_statement\_distribution\_similarity & 0.743 & 0.558 & 0.801 \\
+ln\_exception\_count\_similarity & 0.743 & 0.558 & 0.802 \\
+CFG & 0.743 & 0.558 & 0.801 \\
+ast\_depth\_similarity & 0.743 & 0.558 & 0.801 \\
+edit\_similarity & 0.743 & 0.558 & 0.801 \\
+ast\_shape\_similarity & 0.743 & 0.558 & 0.800 \\
+nesting\_depth\_similarity & 0.743 & 0.558 & 0.801 \\
+ln\_syntax\_both\_valid & 0.743 & 0.558 & 0.801 \\
+Syntax & 0.743 & 0.558 & 0.801 \\
+ln\_branch\_count\_similarity & 0.743 & 0.558 & 0.801 \\
+ln\_control\_profile\_similarity & 0.743 & 0.558 & 0.801 \\
+ln\_identifier\_role\_distribution\_similarity & 0.743 & 0.558 & 0.801 \\
+ln\_nesting\_depth\_similarity & 0.743 & 0.558 & 0.801 \\
+ln\_branching\_factor\_similarity & 0.743 & 0.558 & 0.801 \\
+ln\_max\_ast\_depth\_similarity & 0.743 & 0.558 & 0.801 \\
+ln\_class\_count\_similarity & 0.743 & 0.558 & 0.801 \\
+ln\_def\_use\_count\_similarity & 0.742 & 0.557 & 0.802 \\
+type\_similarity & 0.742 & 0.557 & 0.801 \\
+ln\_assignment\_density\_similarity & 0.741 & 0.556 & 0.802 \\
+api\_mismatch\_score & 0.742 & 0.554 & 0.801 \\
+ln\_read\_write\_ratio\_similarity & 0.739 & 0.549 & 0.803 \\
+AST & 0.736 & 0.548 & 0.798 \\
+ln\_return\_count\_similarity & 0.739 & 0.547 & 0.799 \\
+ln\_operator\_family\_similarity & 0.737 & 0.547 & 0.801 \\
+ln\_cfg\_edges\_similarity & 0.739 & 0.545 & 0.803 \\
+ln\_statement\_density\_similarity & 0.734 & 0.545 & 0.804 \\
+ln\_cyclomatic\_complexity\_similarity & 0.740 & 0.545 & 0.806 \\
+ln\_identifier\_count\_similarity & 0.738 & 0.544 & 0.800 \\
+Length & 0.734 & 0.539 & 0.802 \\
+token\_jaccard & 0.728 & 0.535 & 0.794 \\
+identifier\_role\_similarity & 0.734 & 0.532 & 0.796 \\
+operator\_pattern\_similarity & 0.721 & 0.499 & 0.806 \\
 \bottomrule
 \end{tabular}
 \vspace{0.5em}

@@ -1,18 +1,18 @@
 \begin{table*}[!t]
 \centering
-\small
+\scriptsize
 \resizebox{\textwidth}{!}{%
 \begin{tabular}{lllrrlll}
 \toprule
 Evidence & Category & Primary value & MI & AUC & Cost & Avail. & Design interpretation \\
 \midrule
-Token overlap & Lexical & Surface triage & 0.109 & 0.739 & low & 1.0 & Strong cheap ranking signal, but vulnerable to lexical mimicry. \\
-AST node similarity & Syntactic & Structural alignment & 0.108 & 0.550 & low & 1.0 & Informative in isolation, but weakly separates correct from incorrect candidates. \\
-Condition/operator patterns & Structural & Local computation & 0.069 & 0.633 & low & 1.0 & Behavior-proximal evidence for arithmetic, predicate, and operator errors. \\
-Parse validity & Syntactic & Candidate validity & 0.057 & 0.586 & low & 1.0 & Cheaply removes malformed candidates before deeper verification. \\
-Control flow & Structural & Execution shape & 0.045 & 0.628 & low & 1.0 & Captures branch and loop obligations missed by lexical evidence. \\
-Identifier role consistency & Semantic-static & Value responsibility & 0.018 & 0.640 & low & 1.0 & Useful for explaining role swaps and suspicious data movement. \\
-API mismatch & Semantic-static & Target API misuse & 0.014 & 0.392 & low & 1.0 & Directional diagnostic signal; low values often indicate likely API failure. \\
+LN operator families & Normalized-operator & Normalized computation & 0.000 & 0.580 & low & 1.0 & Compares arithmetic, comparison, logical, and assignment profiles across languages. \\
+LN control profile & Normalized-control & Normalized control flow & 0.039 & 0.628 & low & 1.0 & Compares branch, loop, return, and exception structure extracted independently. \\
+LN statement distribution & Normalized-structure & Normalized structure & 0.000 & 0.570 & low & 1.0 & Compares statement distributions rather than raw parser node labels. \\
+LN syntax validity & Normalized-program & Candidate validity & 0.027 & 0.586 & low & 1.0 & Checks whether both source and candidate parse in their own languages. \\
+LN identifier-role distribution & Normalized-identifier & Identifier-role structure & 0.000 & 0.527 & low & 1.0 & Compares declaration, assignment, and call-role distributions. \\
+LN def-use count & Normalized-dataflow & Data-flow proxy & 0.000 & 0.532 & low & 1.0 & Compares approximate definition-use density without target-reference code. \\
+Token overlap & Weak-proxy & Weak surface proxy & 0.097 & 0.739 & low & 1.0 & Retained as cheap triage evidence, but de-emphasized for semantic claims. \\
 \bottomrule
 \end{tabular}
 }

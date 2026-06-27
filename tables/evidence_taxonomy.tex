@@ -1,22 +1,22 @@
 \begin{table}[!htbp]
 \centering
-\small
+\scriptsize
 \begin{tabular}{lll}
 \toprule
 Evidence & Category & Cost \\
 \midrule
-Token overlap & Lexical & low \\
-Edit similarity & Lexical & low \\
+Token overlap & Weak-proxy & low \\
+Edit similarity & Weak-proxy & low \\
 Length ratio & Lexical & low \\
 Parse validity & Syntactic & low \\
-AST node similarity & Syntactic & medium \\
-AST depth similarity & Syntactic & medium \\
-AST shape similarity & Syntactic & medium \\
-Control flow & Structural & low \\
-Nesting depth & Structural & low \\
-Condition/operator patterns & Structural & low \\
-API overlap & Semantic-static & low \\
-API mismatch & Semantic-static & low \\
+AST node similarity & Weak-proxy & medium \\
+AST depth similarity & Normalized-structure & medium \\
+AST shape similarity & Normalized-structure & medium \\
+Control flow & Normalized-control & low \\
+Nesting depth & Normalized-control & low \\
+Condition/operator patterns & Normalized-operator & low \\
+API overlap & Weak-proxy & low \\
+API mismatch & Weak-proxy & low \\
 \bottomrule
 \end{tabular}
 \vspace{0.5em}

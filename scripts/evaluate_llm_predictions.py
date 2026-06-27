@@ -22,33 +22,12 @@ if str(SRC) not in sys.path:
 
 from evicode.features import static_features  # noqa: E402
 from evicode.io import read_jsonl  # noqa: E402
+from evicode.taxonomy import feature_to_category  # noqa: E402
 from evicode.utils.cli import add_common_args  # noqa: E402
 from evicode.utils.progress import mark_stage, write_json  # noqa: E402
 
 
-STATIC_FEATURES = [
-    "token_jaccard",
-    "edit_similarity",
-    "length_ratio",
-    "syntax_proxy",
-    "ast_similarity",
-    "ast_depth_similarity",
-    "ast_shape_similarity",
-    "control_flow_similarity",
-    "branch_count_similarity",
-    "loop_count_similarity",
-    "return_count_similarity",
-    "nesting_depth_similarity",
-    "operator_pattern_similarity",
-    "api_similarity",
-    "call_similarity",
-    "api_mismatch_score",
-    "identifier_similarity",
-    "identifier_role_similarity",
-    "data_flow_similarity",
-    "type_similarity",
-    "retrieval_similarity",
-]
+STATIC_FEATURES = [feature for feature, category in feature_to_category().items() if category != "Dynamic"]
 
 
 def parse_args() -> argparse.Namespace:

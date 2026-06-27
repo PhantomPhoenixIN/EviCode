@@ -29,6 +29,8 @@ DISPLAY_NAMES = {
     "identifier_only": "Ident.",
     "retrieval_only": "Retr.",
     "static_only": "Static",
+    "language_normalized_only": "LangNorm",
+    "weak_proxy_only": "WeakProxy",
     "execution_example_only": "Ex.",
     "static_plus_example_execution": "Static+Ex.",
     "execution_full_only": "FullExec",
@@ -38,6 +40,12 @@ DISPLAY_NAMES = {
     "syntactic_only": "Syntactic",
     "structural_only": "Structural",
     "semantic_static_only": "SemStatic",
+    "normalized_control_only": "NormCtrl",
+    "normalized_structure_only": "NormStruct",
+    "normalized_operator_only": "NormOp",
+    "normalized_identifier_only": "NormIdent",
+    "normalized_dataflow_only": "NormDF",
+    "normalized_call_only": "NormCall",
     "dynamic_only": "Dynamic",
 }
 
@@ -58,7 +66,7 @@ def latex_table(frame: pd.DataFrame, caption: str, label: str) -> str:
     return (
         "\\begin{table}[!htbp]\n"
         "\\centering\n"
-        "\\small\n"
+        "\\scriptsize\n"
         f"{body}"
         "\\vspace{0.5em}\n"
         f"\\caption{{{caption}}}\n"
@@ -73,7 +81,7 @@ def latex_table_wide(frame: pd.DataFrame, caption: str, label: str) -> str:
     return (
         "\\begin{table*}[!t]\n"
         "\\centering\n"
-        "\\small\n"
+        "\\scriptsize\n"
         "\\resizebox{\\textwidth}{!}{%\n"
         f"{body}"
         "}\n"
@@ -178,6 +186,8 @@ def main() -> int:
         "api_only",
         "identifier_only",
         "retrieval_only",
+        "weak_proxy_only",
+        "language_normalized_only",
         "static_only",
         "execution_example_only",
         "static_plus_example_execution",
@@ -482,39 +492,39 @@ def main() -> int:
             )
             static_value_rows = [
                 (
-                    "token_jaccard",
-                    "Surface triage",
-                    "Strong cheap ranking signal, but vulnerable to lexical mimicry.",
+                    "ln_operator_family_similarity",
+                    "Normalized computation",
+                    "Compares arithmetic, comparison, logical, and assignment profiles across languages.",
                 ),
                 (
-                    "ast_similarity",
-                    "Structural alignment",
-                    "Informative in isolation, but weakly separates correct from incorrect candidates.",
+                    "ln_control_profile_similarity",
+                    "Normalized control flow",
+                    "Compares branch, loop, return, and exception structure extracted independently.",
                 ),
                 (
-                    "operator_pattern_similarity",
-                    "Local computation",
-                    "Behavior-proximal evidence for arithmetic, predicate, and operator errors.",
+                    "ln_statement_distribution_similarity",
+                    "Normalized structure",
+                    "Compares statement distributions rather than raw parser node labels.",
                 ),
                 (
-                    "syntax_proxy",
+                    "ln_syntax_both_valid",
                     "Candidate validity",
-                    "Cheaply removes malformed candidates before deeper verification.",
+                    "Checks whether both source and candidate parse in their own languages.",
                 ),
                 (
-                    "control_flow_similarity",
-                    "Execution shape",
-                    "Captures branch and loop obligations missed by lexical evidence.",
+                    "ln_identifier_role_distribution_similarity",
+                    "Identifier-role structure",
+                    "Compares declaration, assignment, and call-role distributions.",
                 ),
                 (
-                    "identifier_role_similarity",
-                    "Value responsibility",
-                    "Useful for explaining role swaps and suspicious data movement.",
+                    "ln_def_use_count_similarity",
+                    "Data-flow proxy",
+                    "Compares approximate definition-use density without target-reference code.",
                 ),
                 (
-                    "api_mismatch_score",
-                    "Target API misuse",
-                    "Directional diagnostic signal; low values often indicate likely API failure.",
+                    "token_jaccard",
+                    "Weak surface proxy",
+                    "Retained as cheap triage evidence, but de-emphasized for semantic claims.",
                 ),
             ]
             static_value = pd.DataFrame(
