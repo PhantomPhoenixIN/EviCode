@@ -1,0 +1,8 @@
+seed: 42
+test_size: 0.30
+bootstrap_iterations: 500
+workers: 8
+languages: [C, C++, C#, Python, Ruby, Kotlin, Swift]
+scores: [1, 2, 3]
+positive_score: 3
+output_dir: outputs/authentic_only

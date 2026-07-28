@@ -21,8 +21,9 @@ class SimilarityEvidence(EvidenceSource):
 
     def score(self, features: dict[str, float | int | str | bool | None]) -> float:
         """Return the similarity feature as a score."""
-        return float(features["similarity"])
+        value = features.get("similarity")
+        return float(value) if isinstance(value, (float, int)) else 0.0
 
     def explain(self, features: dict[str, float | int | str | bool | None]) -> str:
         """Explain the similarity score."""
-        return f"{self.name} proxy similarity={float(features['similarity']):.3f}."
+        return f"{self.name} proxy similarity={self.score(features):.3f}."

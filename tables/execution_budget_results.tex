@@ -1,21 +1,20 @@
 \begin{table}[!htbp]
 \centering
 \scriptsize
-\begin{tabular}{lllr}
+\begin{tabular}{llrr}
 \toprule
-System & Budget & Feasible & F1 \\
+System & Budget & F1 & AUC \\
 \midrule
-execution\_only & 0 & Yes & 0.000 \\
-execution\_only & example & Yes & 0.862 \\
-execution\_only & full & Yes & 0.885 \\
-execution\_only & 1 & No & - \\
-execution\_only & 3 & No & - \\
-execution\_only & 5 & No & - \\
-execution\_only & 10 & No & - \\
-static\_only & 0 & Yes & 0.558 \\
+execution\_only & 0 & 0.000 & 0.500 \\
+execution\_only & example & 0.879 & 0.924 \\
+execution\_only & full & 0.904 & 0.947 \\
+Static & 0 & 0.558 & 0.801 \\
+Static+Ex. & static/example/full & 0.859 & 0.933 \\
+Static+Full & static/example/full & 0.865 & 0.959 \\
+All & 0 & 0.869 & 0.959 \\
 \bottomrule
 \end{tabular}
 \vspace{0.5em}
-\caption{Verification results for available execution budgets and status of finer-grained test-budget experiments.}
+\caption{Completed execution-availability settings. Finer-grained retained-test budgets require normalized individual assertions and are treated as a validity limitation, not as completed results.}
 \label{tab:execution-budget}
 \end{table}

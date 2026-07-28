@@ -6,8 +6,6 @@ EviCode studies semantic verification as an **evidence decomposition** problem. 
 
 The current artifact evaluates this idea on HumanEval-X translation verification, external source-to-Java LLM predictions from DeepSeekCoder, QwenCoder, and StarCoder, and public aligned-pair corpora from CodeXGLUE, HumanEval-X extra source languages, and XLCoST.
 
-![EviCode architecture](EviCode_Block_Diagram.png)
-
 ## Main Takeaway
 
 Semantic verification is not a single metric problem. In the evaluated settings:
@@ -104,7 +102,7 @@ Complementarity is more important than feature count. Highly correlated blocks s
 
 ![Execution budget comparison](docs/readme_assets/execution_budget_curve.png)
 
-HumanEval-X exposes example and full tests, but not normalized individual test budgets. The supported evidence settings still show an important pattern: the first behavioral signal produces the largest gain. Static-only verification reaches F1 0.558, example execution reaches 0.862, and full execution reaches 0.885.
+HumanEval-X exposes example and full tests, but not normalized individual test budgets. The supported held-out evidence settings still show an important pattern: the first behavioral signal produces the largest gain. Static-only verification reaches F1 0.558, example execution reaches 0.879, and full execution reaches 0.904.
 
 ![Cost-information analysis](docs/readme_assets/cost_information_pareto.png)
 
@@ -159,7 +157,7 @@ The graded LLM outcomes reveal calibration failure under broad source-language s
 | CrystalBLEU | 0.022 | 0.714 | Surface resemblance with filtering |
 | TF-IDF | 0.530 | 0.727 | Better ranking, still non-semantic |
 | CodeBLEU | 0.559 | 0.728 | Structure-aware similarity proxy |
-| Execution | 0.885 | 0.934 | Behavior-observing evidence |
+| Execution | 0.904 | 0.947 | Behavior-observing evidence |
 | EviCode Static | 0.558 | 0.801 | Static ranking and triage |
 | EviCode All | 0.869 | 0.959 | Evidence-fused confidence |
 
@@ -219,7 +217,8 @@ python scripts/run_experiments.py --config configs/humanevalx.yaml --input exper
 python scripts/statistical_analysis.py --config configs/humanevalx.yaml --predictions experiments/humanevalx/fusion_rich/predictions.csv --output-dir statistics/humanevalx_rich --resume
 python scripts/analyze_evidence.py --config configs/humanevalx.yaml --examples datasets/processed/humanevalx/verification_examples.jsonl --evidence experiments/humanevalx/evidence_rich/evidence.jsonl --metrics experiments/humanevalx/fusion_rich/metrics.csv --output-dir results/analysis --resume
 python scripts/evaluate_llm_predictions.py --config configs/humanevalx.yaml --predictions-dir datasets/Predictions_by_LLMs --train-evidence experiments/humanevalx/evidence_rich/evidence.jsonl --output-dir results/llm_predictions --source-languages all --target-language Java --train-source-languages python --train-target-languages java --resume
-python scripts/external_dataset_validation.py --config configs/humanevalx.yaml --train-evidence experiments/humanevalx/evidence_rich/evidence.jsonl --output-dir results/external_validation --train-source-language python --train-target-language java --resume
+python scripts/external_dataset_validation.py --config configs/humanevalx.yaml --train-evidence experiments/humanevalx/evidence_rich/evidence.jsonl --output-dir results/external_validation --train-source-language python --train-target-language java --max-pairs 200 --resume
+python scripts/semantic_accumulation_analysis.py --config configs/humanevalx.yaml --examples datasets/processed/humanevalx/verification_examples.jsonl --evidence experiments/humanevalx/evidence_rich/evidence.jsonl --predictions experiments/humanevalx/fusion_rich/predictions.csv --output-dir results/semantic_accumulation --resume
 python scripts/generate_artifacts.py --config configs/humanevalx.yaml --dataset datasets/processed/humanevalx/verification_examples.jsonl --evidence experiments/humanevalx/evidence_rich/evidence.jsonl --metrics experiments/humanevalx/fusion_rich/metrics.csv --statistics-dir statistics/humanevalx_rich --output-dir results/humanevalx_rich --resume
 python scripts/build_paper.py --config configs/humanevalx.yaml --output-dir paper/output --resume --force
 ```

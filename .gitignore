@@ -10,6 +10,7 @@ htmlcov/
 
 # Environments
 .venv/
+.venv-*/
 venv/
 env/
 .env
@@ -28,6 +29,25 @@ results/*
 !results/.gitkeep
 logs/*
 !logs/.gitkeep
+outputs/**
+!outputs/
+!outputs/authentic_only/
+!outputs/authentic_only/figures/
+!outputs/authentic_only/figures/calibration.pdf
+!outputs/authentic_only/figures/confidence_histogram.pdf
+!outputs/authentic_only/figures/evidence_importance.pdf
+!outputs/authentic_only/figures/evidence_reasoning_chain.pdf
+!outputs/authentic_only/figures/family_correlation.pdf
+!outputs/authentic_only/figures/family_grade_distributions.pdf
+!outputs/authentic_only/figures/generator_reliability_and_scores.pdf
+!outputs/authentic_only/figures/generator_transfer_matrix.pdf
+!outputs/authentic_only/figures/language_transfer_matrix.pdf
+!outputs/authentic_only/figures/language_wise_auc.pdf
+!outputs/authentic_only/figures/logo_language_auc.pdf
+!outputs/authentic_only/figures/quality_progression_heatmap.pdf
+!outputs/authentic_only/figures/semantic_observability_continuum.pdf
+authentic_supervision/
+authentic_only_study/cache/
 
 # Generated paper artifacts
 paper/*.aux
@@ -37,6 +57,35 @@ paper/*.log
 paper/*.out
 paper/*.pdf
 paper/output/
+paper/*layout*.txt
+paper/*review*.md
+paper_v2/*.aux
+paper_v2/*.blg
+paper_v2/*.log
+paper_v2/*.out
+paper_v2/*layout*.txt
+paper_v2/*audit*.png
+
+# Local scratch notebooks and demos
+colab_execution.ipynb
+APP_*.md
+app.py
+app_samples.json
+requirements-app.txt
+artifacts/
+requirements-reference.txt
+configs/reference_metric_comparison.yaml
+figures/reference_based_vs_evicode.pdf
+scripts/reference_comparison/
+scripts/codenettrans_qs/
+scripts/export_app_model.py
+src/evicode/app_*.py
+tests/test_app_service.py
+tests/test_reference_comparison.py
+tests/test_codenettrans_qs.py
+tests/fixtures/
+tables/reference_metric_*.tex
+tables/usage_scenarios.tex
 
 # OS/editor
 .DS_Store

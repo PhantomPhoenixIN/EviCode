@@ -47,28 +47,12 @@ EVIDENCE_SOURCES = [
         "Ratio between shorter and longer program length.",
     ),
     EvidenceSource(
-        "Parse validity",
-        "syntax_proxy",
-        "Syntactic",
-        "binary",
-        "low",
-        "Tree-sitter parse validity for both source and target programs.",
-    ),
-    EvidenceSource(
         "AST node similarity",
         "ast_similarity",
         "Weak-proxy",
         "continuous",
         "medium",
         "Cosine similarity over language-specific parser node types; retained only as a weak proxy.",
-    ),
-    EvidenceSource(
-        "AST depth similarity",
-        "ast_depth_similarity",
-        "Normalized-structure",
-        "continuous",
-        "medium",
-        "Similarity of maximum parse-tree depth; an approximation, not tree edit distance.",
     ),
     EvidenceSource(
         "AST shape similarity",
@@ -87,12 +71,28 @@ EVIDENCE_SOURCES = [
         "Similarity over branch, loop, return, and exception keyword counts.",
     ),
     EvidenceSource(
-        "Nesting depth",
-        "nesting_depth_similarity",
-        "Normalized-control",
+        "Raw branch-count agreement",
+        "branch_count_similarity",
+        "Weak-proxy",
         "continuous",
         "low",
-        "Similarity of approximate brace/indentation nesting depth.",
+        "Keyword-derived branch-count agreement retained as a lower-level control.",
+    ),
+    EvidenceSource(
+        "Raw loop-count agreement",
+        "loop_count_similarity",
+        "Weak-proxy",
+        "continuous",
+        "low",
+        "Keyword-derived loop-count agreement retained as a lower-level control.",
+    ),
+    EvidenceSource(
+        "Raw return-count agreement",
+        "return_count_similarity",
+        "Weak-proxy",
+        "continuous",
+        "low",
+        "Keyword-derived return-count agreement retained as a lower-level control.",
     ),
     EvidenceSource(
         "Condition/operator patterns",
@@ -109,6 +109,14 @@ EVIDENCE_SOURCES = [
         "continuous",
         "low",
         "Overlap of language-specific imports, dotted calls, and method-call tokens; weak across languages.",
+    ),
+    EvidenceSource(
+        "Call-name overlap",
+        "call_similarity",
+        "Weak-proxy",
+        "continuous",
+        "low",
+        "Jaccard overlap of extracted call names; retained as a lower-level cross-language control.",
     ),
     EvidenceSource(
         "API mismatch",
@@ -149,14 +157,6 @@ EVIDENCE_SOURCES = [
         "continuous",
         "medium",
         "Overlap of declared type and signature tokens, most informative for Java.",
-    ),
-    EvidenceSource(
-        "Retrieval similarity",
-        "retrieval_similarity",
-        "Weak-proxy",
-        "continuous",
-        "low",
-        "Text similarity used as a retrieval-style nearest-neighbor proxy.",
     ),
     EvidenceSource("LN syntax validity", "ln_syntax_both_valid", "Normalized-program", "binary", "low", "Whether both programs parse in their own languages."),
     EvidenceSource("LN CFG node count", "ln_cfg_nodes_similarity", "Normalized-control", "continuous", "low", "Similarity of normalized CFG node-count proxy."),
@@ -203,6 +203,67 @@ EVIDENCE_SOURCES = [
         "Whether the target program passes the full available test suite.",
     ),
 ]
+
+
+# One exhaustive, non-overlapping family assignment for the 45 static probes.
+# Keeping this next to the taxonomy prevents analysis and visualization scripts
+# from silently using different definitions of an observation family.
+OBSERVATION_FAMILIES = {
+    "Surface": ["token_jaccard", "edit_similarity", "length_ratio"],
+    "Syntax": ["ln_syntax_both_valid"],
+    "Structure": [
+        "ast_similarity",
+        "ast_shape_similarity",
+        "type_similarity",
+        "ln_function_count_similarity",
+        "ln_class_count_similarity",
+        "ln_max_ast_depth_similarity",
+        "ln_avg_tree_depth_similarity",
+        "ln_branching_factor_similarity",
+        "ln_statement_density_similarity",
+        "ln_expression_density_similarity",
+        "ln_statement_distribution_similarity",
+        "ln_expression_distribution_similarity",
+    ],
+    "Control flow": [
+        "control_flow_similarity",
+        "branch_count_similarity",
+        "loop_count_similarity",
+        "return_count_similarity",
+        "ln_cfg_nodes_similarity",
+        "ln_cfg_edges_similarity",
+        "ln_branch_count_similarity",
+        "ln_loop_count_similarity",
+        "ln_return_count_similarity",
+        "ln_exception_count_similarity",
+        "ln_control_profile_similarity",
+    ],
+    "Operators": ["operator_pattern_similarity", "ln_operator_family_similarity"],
+    "Identifiers": [
+        "identifier_similarity",
+        "identifier_role_similarity",
+        "ln_identifier_count_similarity",
+        "ln_identifier_entropy_similarity",
+        "ln_identifier_role_count_similarity",
+        "ln_identifier_role_distribution_similarity",
+    ],
+    "Data flow": [
+        "data_flow_similarity",
+        "ln_def_use_count_similarity",
+        "ln_read_write_ratio_similarity",
+        "ln_assignment_density_similarity",
+    ],
+    "APIs": [
+        "api_similarity",
+        "call_similarity",
+        "api_mismatch_score",
+        "ln_call_count_similarity",
+    ],
+    "Complexity": [
+        "ln_cyclomatic_complexity_similarity",
+        "ln_nesting_depth_similarity",
+    ],
+}
 
 
 def taxonomy_rows() -> list[dict[str, str]]:

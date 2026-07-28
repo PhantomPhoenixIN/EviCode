@@ -1,0 +1,20 @@
+\begin{table}
+\caption{Top static evidence sources by mean absolute SHAP value on the held-out split. SHAP and coefficients measure conditional model use; MI measures marginal label information.}
+\label{tab:shap-comparison}
+\begin{tabular}{lrrr}
+\toprule
+Evidence & SHAP & |Coef.| & MI \\
+\midrule
+Token overlap & 1.009 & 1.346 & 0.122 \\
+Condition/operator patterns & 0.523 & 0.563 & 0.066 \\
+LN cyclomatic complexity & 0.483 & 0.527 & 0.030 \\
+LN syntax validity & 0.483 & 0.746 & 0.045 \\
+Parse validity & 0.483 & 0.746 & 0.040 \\
+LN CFG edge count & 0.389 & 0.414 & 0.052 \\
+LN statement density & 0.290 & 0.338 & 0.000 \\
+Identifier role consistency & 0.280 & 0.385 & 0.016 \\
+Control flow & 0.262 & 0.318 & 0.043 \\
+LN expression distribution & 0.231 & 0.276 & 0.000 \\
+\bottomrule
+\end{tabular}
+\end{table}

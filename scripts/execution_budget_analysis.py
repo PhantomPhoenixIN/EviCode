@@ -78,23 +78,37 @@ def main() -> int:
     y = evidence["label"].astype(int)
     rows = [
         metric_row("execution_only", "0", y, pd.Series([0] * len(y)), True, "No dynamic evidence."),
-        metric_row(
-            "execution_only",
-            "example",
-            y,
-            evidence["execution_passed_example"].astype(float),
-            True,
-            "HumanEval-X example test program.",
-        ),
-        metric_row(
-            "execution_only",
-            "full",
-            y,
-            evidence["execution_passed_full"].astype(float),
-            True,
-            "Full HumanEval-X test program.",
-        ),
     ]
+    execution_metric_map = {
+        "example": "execution_example_only",
+        "full": "execution_full_only",
+    }
+    for budget, system in execution_metric_map.items():
+        metric = metrics[metrics["system"] == system]
+        if metric.empty:
+            score_column = f"execution_passed_{budget}"
+            rows.append(
+                metric_row(
+                    "execution_only",
+                    budget,
+                    y,
+                    evidence[score_column].astype(float),
+                    True,
+                    f"HumanEval-X {budget} test program.",
+                )
+            )
+            continue
+        item = metric.iloc[0].to_dict()
+        item.update(
+            {
+                "system": "execution_only",
+                "budget": budget,
+                "feasible": True,
+                "actual_test_source": "held_out_split_metrics",
+                "note": f"Held-out grouped-split {system} result.",
+            }
+        )
+        rows.append(item)
     for budget in ["1", "3", "5", "10"]:
         rows.append(
             metric_row(

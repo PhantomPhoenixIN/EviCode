@@ -55,7 +55,12 @@ def _run_subprocess(cmd: list[str], cwd: Path, timeout_seconds: int) -> Executio
             check=False,
         )
     except subprocess.TimeoutExpired as exc:
-        return ExecutionResult(False, False, None, exc.stdout or "", exc.stderr or "", True)
+        def timeout_text(value: bytes | str | None) -> str:
+            if isinstance(value, bytes):
+                return value.decode(errors="replace")
+            return value or ""
+
+        return ExecutionResult(False, False, None, timeout_text(exc.stdout), timeout_text(exc.stderr), True)
     return ExecutionResult(
         available=True,
         passed=completed.returncode == 0,

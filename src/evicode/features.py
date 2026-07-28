@@ -243,7 +243,7 @@ def type_tokens(code: str) -> set[str]:
 def statement_distribution(code: str, language: str) -> Counter[str]:
     """Extract a language-normalized statement distribution."""
     lowered = code.lower()
-    dist = Counter()
+    dist: Counter[str] = Counter()
     dist["branch"] = counter_for_terms(lowered, ["if", "elif", "else", "switch", "case"])
     dist["loop"] = counter_for_terms(lowered, ["for", "while", "do"])
     dist["return"] = counter_for_terms(lowered, ["return"])

@@ -11,6 +11,10 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 
+# IEEE PDF validation rejects Type 3 fonts. Embed TrueType outlines in every
+# generated vector figure so text remains searchable and publication-safe.
+plt.rcParams.update({"pdf.fonttype": 42, "ps.fonttype": 42})
+
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
 if str(SRC) not in sys.path:
@@ -438,6 +442,12 @@ def main() -> int:
                 "mutual_information": "MI",
             }
         )
+        info_table["Evidence"] = info_table["Evidence"].replace(
+            {"Condition/operator patterns": "Operator patterns"}
+        )
+        info_table["Category"] = info_table["Category"].replace(
+            {"Normalized-operator": "Norm.-operator", "Semantic-static": "Sem.-static"}
+        )
         (tables / "evidence_informativeness.tex").write_text(
             latex_table(
                 info_table,
@@ -744,14 +754,31 @@ def main() -> int:
 
     if (budget_dir / "execution_budget_results.csv").exists():
         budget = pd.read_csv(budget_dir / "execution_budget_results.csv")
-        budget_table = budget[["system", "budget", "feasible", "f1"]].rename(
-            columns={"system": "System", "budget": "Budget", "feasible": "Feasible", "f1": "F1"}
+        budget_table_source = budget[budget["feasible"] == True].copy()  # noqa: E712
+        budget_table_source = budget_table_source[
+            budget_table_source["system"].isin(
+                [
+                    "execution_only",
+                    "static_only",
+                    "static_plus_example_execution",
+                    "static_plus_full_execution",
+                    "all_evidence",
+                ]
+            )
+        ]
+        budget_table = budget_table_source[["system", "budget", "f1", "roc_auc"]].rename(
+            columns={
+                "system": "System",
+                "budget": "Budget",
+                "f1": "F1",
+                "roc_auc": "AUC",
+            }
         )
-        budget_table["Feasible"] = budget_table["Feasible"].map({True: "Yes", False: "No"})
+        budget_table["System"] = budget_table["System"].map(DISPLAY_NAMES).fillna(budget_table["System"])
         (tables / "execution_budget_results.tex").write_text(
             latex_table(
-                budget_table.head(8),
-                "Verification results for available execution budgets and status of finer-grained test-budget experiments.",
+                budget_table,
+                "Completed execution-availability settings. Finer-grained retained-test budgets require normalized individual assertions and are treated as a validity limitation, not as completed results.",
                 "tab:execution-budget",
             ),
             encoding="utf-8",
@@ -795,14 +822,15 @@ def main() -> int:
 
     if (weak_dir / "weak_test_results.csv").exists():
         weak = pd.read_csv(weak_dir / "weak_test_results.csv")
-        weak_table = weak[["retention", "system", "feasible", "mean_f1"]].rename(
-            columns={"retention": "Retention", "system": "System", "feasible": "Feasible", "mean_f1": "F1"}
+        weak = weak[weak["feasible"] == True].copy()  # noqa: E712
+        weak_table = weak[["retention", "system", "mean_f1", "note"]].drop_duplicates().rename(
+            columns={"retention": "Retention", "system": "System", "mean_f1": "F1", "note": "Interpretation"}
         )
-        weak_table["Feasible"] = weak_table["Feasible"].map({True: "Yes", False: "No"})
+        weak_table["System"] = weak_table["System"].map(DISPLAY_NAMES).fillna(weak_table["System"])
         (tables / "weak_test_results.tex").write_text(
             latex_table(
-                weak_table.head(8),
-                "Weak-test robustness status, separating completed static baselines from dynamic retention experiments that require normalized individual tests.",
+                weak_table,
+                "Static baseline under retained-test scenarios. Dynamic retained-test outcomes require normalized individual assertions and are not reported as completed experiments.",
                 "tab:weak-tests",
             ),
             encoding="utf-8",
@@ -860,6 +888,11 @@ def main() -> int:
                 "Execution accuracy": "Exec.",
             }
         )
+        full_exec = metrics[metrics["system"] == "execution_full_only"]
+        if not full_exec.empty and "Exec." in set(metric_comp["metric"]):
+            metric_comp.loc[metric_comp["metric"] == "Exec.", ["accuracy", "f1", "roc_auc"]] = full_exec.iloc[0][
+                ["accuracy", "f1", "roc_auc"]
+            ].to_numpy()
         metric_table = metric_comp.rename(
             columns={"metric": "Metric", "f1": "F1", "roc_auc": "AUC", "pr_auc": "PR-AUC"}
         )
@@ -1017,6 +1050,15 @@ def main() -> int:
 
     if (phase2_dir / "evidence_hierarchy.csv").exists():
         hierarchy = pd.read_csv(phase2_dir / "evidence_hierarchy.csv")
+        hierarchy["level"] = hierarchy["level"].replace(
+            {
+                "L1_weak_proxy": "Weak proxy",
+                "L2_normalized_program": "Program",
+                "L3_normalized_control_structure": "Control/structure",
+                "L4_normalized_semantic_static": "Semantic static",
+                "L5_dynamic": "Dynamic",
+            }
+        )
         hierarchy_table = hierarchy[["level", "num_features", "f1", "roc_auc", "incremental_f1"]].rename(
             columns={"level": "Level", "num_features": "Feat.", "f1": "F1", "roc_auc": "AUC", "incremental_f1": "Delta F1"}
         )
@@ -1401,7 +1443,7 @@ def main() -> int:
         "Likely failure: semantic or control-flow mismatch"
     )
     ax.text(0.03, 0.82, report_text, family="monospace", fontsize=11, va="top")
-    plt.tight_layout()
+    plt.subplots_adjust(left=0.02, right=0.98, top=0.98, bottom=0.02)
     plt.savefig(figures / "qualitative_evidence_report.pdf")
     plt.close()
 

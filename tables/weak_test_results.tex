@@ -1,21 +1,18 @@
 \begin{table}[!htbp]
 \centering
 \scriptsize
-\begin{tabular}{rllr}
+\begin{tabular}{rlrl}
 \toprule
-Retention & System & Feasible & F1 \\
+Retention & System & F1 & Interpretation \\
 \midrule
-1.000 & static\_only & Yes & 0.558 \\
-1.000 & execution\_only & No & - \\
-1.000 & static\_plus\_weak\_execution & No & - \\
-0.750 & static\_only & Yes & 0.558 \\
-0.750 & execution\_only & No & - \\
-0.750 & static\_plus\_weak\_execution & No & - \\
-0.500 & static\_only & Yes & 0.558 \\
-0.500 & execution\_only & No & - \\
+1.000 & Static & 0.558 & Static evidence is independent of retained dynamic tests. \\
+0.750 & Static & 0.558 & Static evidence is independent of retained dynamic tests. \\
+0.500 & Static & 0.558 & Static evidence is independent of retained dynamic tests. \\
+0.250 & Static & 0.558 & Static evidence is independent of retained dynamic tests. \\
+0.100 & Static & 0.558 & Static evidence is independent of retained dynamic tests. \\
 \bottomrule
 \end{tabular}
 \vspace{0.5em}
-\caption{Weak-test robustness status, separating completed static baselines from dynamic retention experiments that require normalized individual tests.}
+\caption{Static baseline under retained-test scenarios. Dynamic retained-test outcomes require normalized individual assertions and are not reported as completed experiments.}
 \label{tab:weak-tests}
 \end{table}

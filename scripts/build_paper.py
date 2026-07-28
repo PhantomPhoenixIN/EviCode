@@ -12,6 +12,9 @@ import matplotlib.patches as patches
 import matplotlib.pyplot as plt
 import pandas as pd
 
+# IEEE PDF validation rejects Type 3 fonts in submitted figures.
+plt.rcParams.update({"pdf.fonttype": 42, "ps.fonttype": 42})
+
 ROOT = Path(__file__).resolve().parents[1]
 PAPER = ROOT / "paper"
 FIGURES = ROOT / "figures"
@@ -110,7 +113,7 @@ def generate_pipeline_figure(resume: bool, force: bool) -> None:
     ax.text(
         0.5,
         0.975,
-        "EviCode: Evidence-Grounded Semantic Verification",
+        "EviCode: Studying Observations for Semantic Confidence",
         ha="center",
         va="top",
         fontsize=18,
@@ -120,7 +123,7 @@ def generate_pipeline_figure(resume: bool, force: bool) -> None:
     ax.text(
         0.5,
         0.93,
-        "Structured static and dynamic signals are extracted, fused, calibrated, and explained",
+        "A transparent analysis instrument preserves each observation before confidence estimation",
         ha="center",
         va="top",
         fontsize=11,
@@ -131,7 +134,7 @@ def generate_pipeline_figure(resume: bool, force: bool) -> None:
     # Input column.
     rounded_box(0.02, 0.19, 0.18, 0.67, blue)
     header(0.02, 0.82, 0.18, "1. INPUT PROGRAM PAIR", blue)
-    ax.text(0.11, 0.77, "Reference x", ha="center", fontsize=10, fontweight="bold")
+    ax.text(0.11, 0.77, "Source x", ha="center", fontsize=10, fontweight="bold")
     rounded_box(0.045, 0.665, 0.13, 0.08, blue, alpha=0.04)
     ax.text(0.11, 0.707, "def add(a, b):\n    return a + b", ha="center", va="center", fontsize=9, family="monospace")
     ax.text(0.11, 0.60, "Candidate y", ha="center", fontsize=10, fontweight="bold")
@@ -146,13 +149,13 @@ def generate_pipeline_figure(resume: bool, force: bool) -> None:
     ax.text(0.11, 0.235, "language pair  |  task id  |  budget", ha="center", fontsize=8.5, color=gray)
 
     # Evidence extraction column.
-    rounded_box(0.25, 0.12, 0.31, 0.74, purple)
+    rounded_box(0.25, 0.18, 0.31, 0.68, purple)
     header(0.25, 0.82, 0.31, "2. EVIDENCE EXTRACTION", purple)
     ax.text(0.405, 0.785, "Heterogeneous evidence sources", ha="center", fontsize=9.5, color="#2f2154")
     evidence_rows = [
         ("Lexical", "token overlap", [True, True, True]),
         ("Syntax", "parse validity / AST", [True, True, False]),
-        ("Structure", "CFG and operators", [True, False, True]),
+        ("Structure", "program organization", [True, False, True]),
         ("API", "calls and library use", [True, False, False]),
         ("Identifiers", "roles and consistency", [True, True, True]),
         ("Data flow", "def-use relations", [True, False, True]),
@@ -165,17 +168,15 @@ def generate_pipeline_figure(resume: bool, force: bool) -> None:
         rounded_box(0.265, y - 0.048, 0.255, 0.045, purple, alpha=0.035)
         ax.text(0.278, y - 0.025, name, ha="left", va="center", fontsize=9.2, fontweight="bold")
         ax.text(0.365, y - 0.025, detail, ha="left", va="center", fontsize=8.2, color=gray)
-        for col, val in enumerate(vals):
-            (tick if val else cross)(0.468 + col * 0.019, y - 0.025)
         ax.text(0.535, y - 0.025, f"$e_{idx}$", ha="center", va="center", fontsize=11)
         y -= 0.063
-    rounded_box(0.29, 0.155, 0.22, 0.045, purple, alpha=0.025)
-    ax.text(0.40, 0.178, r"$E(x,y)=[e_1,\ldots,e_9]\in\mathbb{R}^{9}$", ha="center", va="center", fontsize=11)
+    rounded_box(0.29, 0.178, 0.22, 0.035, purple, alpha=0.025)
+    ax.text(0.40, 0.196, r"$E(x,y)=[e_1,\ldots,e_9]$", ha="center", va="center", fontsize=10.5)
 
     # Fusion column.
-    rounded_box(0.60, 0.12, 0.18, 0.74, green)
-    header(0.60, 0.82, 0.18, "3. EVIDENCE FUSION", green)
-    ax.text(0.69, 0.775, "cost-aware logistic fusion", ha="center", fontsize=9.2)
+    rounded_box(0.60, 0.18, 0.18, 0.68, green)
+    header(0.60, 0.82, 0.18, "3. OBSERVATION FUSION", green)
+    ax.text(0.69, 0.775, "transparent logistic model", ha="center", fontsize=9.2)
     rounded_box(0.625, 0.67, 0.13, 0.06, green, alpha=0.04)
     ax.text(0.69, 0.70, r"$w_1e_1+\cdots+w_9e_9+b$", ha="center", va="center", fontsize=10.5)
     arrow(0.69, 0.66, 0.69, 0.59, green)
@@ -183,7 +184,7 @@ def generate_pipeline_figure(resume: bool, force: bool) -> None:
     ax.text(0.69, 0.545, r"$P(correct\mid x,y)=\sigma(z)$", ha="center", va="center", fontsize=10.5)
     arrow(0.69, 0.49, 0.69, 0.42, green)
     rounded_box(0.625, 0.32, 0.13, 0.08, green, alpha=0.04)
-    ax.text(0.69, 0.36, "calibration\nand uncertainty", ha="center", va="center", fontsize=9.2)
+    ax.text(0.69, 0.36, "calibration\nassessment", ha="center", va="center", fontsize=9.2)
     arrow(0.69, 0.31, 0.69, 0.24, green)
     rounded_box(0.625, 0.19, 0.13, 0.055, green, alpha=0.04)
     ax.text(0.69, 0.218, "confidence score", ha="center", va="center", fontsize=9.2)
@@ -191,7 +192,7 @@ def generate_pipeline_figure(resume: bool, force: bool) -> None:
     # Output column.
     rounded_box(0.83, 0.19, 0.15, 0.67, blue)
     header(0.83, 0.82, 0.15, "4. DECISION", blue)
-    ax.text(0.905, 0.75, "Verification score", ha="center", fontsize=10, fontweight="bold", color=blue)
+    ax.text(0.905, 0.75, "Illustrative confidence", ha="center", fontsize=10, fontweight="bold", color=blue)
     ax.add_patch(patches.Wedge((0.905, 0.66), 0.065, 0, 180, width=0.017, facecolor="#d9d9d9", edgecolor="none"))
     for start, end, color in [(0, 50, green), (50, 120, "#d6c400"), (120, 180, red)]:
         ax.add_patch(patches.Wedge((0.905, 0.66), 0.065, start, end, width=0.017, facecolor=color, edgecolor="none"))
@@ -201,12 +202,16 @@ def generate_pipeline_figure(resume: bool, force: bool) -> None:
         ax.scatter([0.855], [y_dec], s=170, color=color)
         ax.text(0.855, y_dec - 0.001, r"$\checkmark$" if label == "Accept" else ("?" if label == "Review" else r"$\times$"), ha="center", va="center", color="white", fontsize=11, fontweight="bold")
         ax.text(0.877, y_dec, label, ha="left", va="center", fontsize=9.5)
-    ax.text(0.905, 0.335, "Top evidence", ha="center", fontsize=10, fontweight="bold", color=blue)
-    bars = [("Execution", 0.09, green), ("API", 0.065, green), ("Identifiers", 0.045, green), ("AST", 0.035, red)]
-    for i, (label, width, color) in enumerate(bars):
-        yy = 0.295 - i * 0.038
-        ax.text(0.845, yy, label, ha="left", va="center", fontsize=8)
-        ax.add_patch(patches.Rectangle((0.905, yy - 0.009), width, 0.017, facecolor=color, alpha=0.85))
+    ax.text(0.905, 0.335, "Explanation", ha="center", fontsize=10, fontweight="bold", color=blue)
+    ax.text(
+        0.905,
+        0.275,
+        "supporting and weakening\nobservations retained",
+        ha="center",
+        va="center",
+        fontsize=8.5,
+        color=gray,
+    )
 
     # Analyses band.
     rounded_box(0.02, 0.025, 0.76, 0.105, "#7aa6d9", alpha=0.10)
