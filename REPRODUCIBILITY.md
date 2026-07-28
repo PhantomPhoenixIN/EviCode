@@ -4,7 +4,7 @@ This repository is organized around the current EviCode paper:
 
 **EviCode: Interpretable Reference- and Execution-Free Verification of Code Translation Using Language-Normalized Semantic Evidence**
 
-The active manuscript is `paper_v2/main_v2.tex`. The compiled PDF is intentionally not tracked in GitHub.
+The manuscript source and compiled paper are intentionally not tracked in GitHub. The repository contains the reproducibility code, configurations, and current figure artifacts for the EviCode study.
 
 ## Dependency Policy
 
@@ -78,16 +78,6 @@ The paper uses the figure PDFs tracked under:
 ```text
 outputs/authentic_only/figures/
 ```
-
-## Build the Current Manuscript
-
-```bash
-cd paper_v2
-pdflatex -interaction=nonstopmode -halt-on-error main_v2.tex
-pdflatex -interaction=nonstopmode -halt-on-error main_v2.tex
-```
-
-The generated PDF remains local because `paper_v2/*.pdf` is ignored.
 
 ## Validation Notes
 

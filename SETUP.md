@@ -57,9 +57,6 @@ python --version
 python -m pytest
 python authentic_only_study/extract.py --config authentic_only_study/config.yaml
 python authentic_only_study/analyze.py --config authentic_only_study/config.yaml
-cd paper_v2
-pdflatex -interaction=nonstopmode -halt-on-error main_v2.tex
-pdflatex -interaction=nonstopmode -halt-on-error main_v2.tex
 ```
 
 Full current-paper reproduction commands are maintained in `REPRODUCIBILITY.md`.

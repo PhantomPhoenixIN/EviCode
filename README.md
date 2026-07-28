@@ -8,25 +8,11 @@ The central scientific question is:
 
 > What correctness-related information remains statically observable from a source program and generated candidate when neither a trusted target implementation nor executable test cases are available?
 
-## Current Paper Artifact
+## Current Artifact
 
-The active manuscript source is in:
+The manuscript source and compiled paper are intentionally not tracked in GitHub. This repository contains the code, configurations, dataset interfaces, analysis scripts, and current figure artifacts needed for the EviCode study.
 
-```text
-paper_v2/main_v2.tex
-paper_v2/references_v2.bib
-paper_v2/main_v2.bbl
-```
-
-The compiled PDF is intentionally not tracked in GitHub. Build it locally with:
-
-```bash
-cd paper_v2
-pdflatex -interaction=nonstopmode -halt-on-error main_v2.tex
-pdflatex -interaction=nonstopmode -halt-on-error main_v2.tex
-```
-
-The current paper figures used by `paper_v2/main_v2.tex` are tracked only under:
+The current paper figures are tracked under:
 
 ```text
 outputs/authentic_only/figures/
@@ -81,8 +67,7 @@ See `REPRODUCIBILITY.md` for the full current-paper reproduction notes.
 
 | Path | Purpose |
 |---|---|
-| `paper_v2/` | Current manuscript source and bibliography files |
-| `outputs/authentic_only/figures/` | Current paper figure artifacts referenced by the manuscript |
+| `outputs/authentic_only/figures/` | Current figure artifacts from the paper study |
 | `authentic_only_study/` | Current CodeNetTrans-QS extraction, analysis, and visualization scripts |
 | `scripts/feature_basis_audit.py` | 53-to-45 probe-basis audit used in the current paper |
 | `scripts/model_capacity_ablation.py` | Learner-capacity sensitivity for the explicit EviCode representation |

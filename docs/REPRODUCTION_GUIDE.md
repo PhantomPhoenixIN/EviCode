@@ -35,12 +35,4 @@ python authentic_only_study/presentation_figures.py
 python authentic_only_study/conceptual_figure.py
 ```
 
-Build the manuscript locally:
-
-```bash
-cd paper_v2
-pdflatex -interaction=nonstopmode -halt-on-error main_v2.tex
-pdflatex -interaction=nonstopmode -halt-on-error main_v2.tex
-```
-
-The compiled PDF is ignored and should remain local.
+The manuscript source and compiled paper are intentionally excluded from the GitHub repository.
