@@ -63,6 +63,7 @@ paper_v2/*.aux
 paper_v2/*.blg
 paper_v2/*.log
 paper_v2/*.out
+paper_v2/*.pdf
 paper_v2/*layout*.txt
 paper_v2/*audit*.png
 
