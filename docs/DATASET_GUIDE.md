@@ -1,22 +1,21 @@
 # Dataset Guide
 
-Primary target: HumanEval-X.
+The current paper uses CodeNetTrans-QS scored generator outputs.
 
-The current completed benchmark uses HumanEval-X for Python, Java, and JavaScript. Dataset scripts are resume-safe and must never overwrite data unless `--force` is provided.
-
-Completed stages:
-
-1. Download/cache HumanEval-X.
-2. Build translation-pair records.
-3. Generate positive and controlled negative pairs.
-4. Attach test cases where available.
-5. Save JSONL shards and manifests.
-
-Current processed output:
+Tracked input files live under:
 
 ```text
-datasets/processed/humanevalx/verification_examples.jsonl
-datasets/processed/humanevalx/manifest.json
+datasets/Predictions_by_LLMs/
 ```
 
-The benchmark contains 2,952 directed verification examples from 164 tasks: 984 positive pairs and 1,968 controlled negative pairs.
+The current controlled analysis retains translations from C, C++, C#, Python, Ruby, Kotlin, and Swift to Java. Java is fixed as the target language to keep target parsing, wrapper conventions, runtime assumptions, and API environment constant while source language and generator vary.
+
+The current pipeline reads complete generator outputs and their released execution grades. It does not create synthetic negatives for the current paper.
+
+The active source-language configuration is:
+
+```text
+authentic_only_study/config.yaml
+```
+
+Feature extraction excludes target references, execution outcomes, compiler outcomes, test results, generator identity, and problem identifiers from the inference feature matrix.

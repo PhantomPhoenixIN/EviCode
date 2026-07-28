@@ -31,7 +31,7 @@ Install these manually before running project scripts:
 
 ## Python Environment
 
-From `F:\Research\EviCode`:
+From the repository root:
 
 ```powershell
 python -m venv .venv
@@ -55,8 +55,11 @@ After setup:
 ```powershell
 python --version
 python -m pytest
-python scripts/run_smoke.py --config configs/smoke.yaml --output-dir experiments/smoke --resume
-python scripts/build_paper.py --config configs/humanevalx.yaml --output-dir paper/output --resume --force
+python authentic_only_study/extract.py --config authentic_only_study/config.yaml
+python authentic_only_study/analyze.py --config authentic_only_study/config.yaml
+cd paper_v2
+pdflatex -interaction=nonstopmode -halt-on-error main_v2.tex
+pdflatex -interaction=nonstopmode -halt-on-error main_v2.tex
 ```
 
-The smoke test must succeed before larger datasets or experiments are attempted. Full benchmark reproduction commands are maintained in `REPRODUCIBILITY.md`.
+Full current-paper reproduction commands are maintained in `REPRODUCIBILITY.md`.

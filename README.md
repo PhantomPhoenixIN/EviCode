@@ -1,226 +1,95 @@
 # EviCode
 
-**Understanding Verification Evidence for Machine-Generated Code**
+**Interpretable Reference- and Execution-Free Verification of Code Translation Using Language-Normalized Semantic Evidence**
 
-EviCode studies semantic verification as an **evidence decomposition** problem. Instead of asking only whether a generated program is correct, EviCode asks which evidence sources support that decision: syntax validity, normalized control-flow structure, normalized structural statistics, operator-family profiles, identifier-role distributions, data-flow proxies, and execution.
+EviCode, short for **Evidence-based Verification for Code**, studies whether generated code translations can be assessed when inference has access only to the source program and the generated Java candidate. The current paper uses CodeNetTrans-QS execution labels for research evaluation, but excludes references, tests, execution outcomes, compiler outcomes, generator identity, and problem identifiers from the feature matrix at inference.
 
-The current artifact evaluates this idea on HumanEval-X translation verification, external source-to-Java LLM predictions from DeepSeekCoder, QwenCoder, and StarCoder, and public aligned-pair corpora from CodeXGLUE, HumanEval-X extra source languages, and XLCoST.
+The central scientific question is:
 
-## Main Takeaway
+> What correctness-related information remains statically observable from a source program and generated candidate when neither a trusted target implementation nor executable test cases are available?
 
-Semantic verification is not a single metric problem. In the evaluated settings:
+## Current Paper Artifact
 
-- Execution provides the strongest correctness evidence because it observes behavior.
-- Static evidence cannot certify correctness, but language-normalized source-to-candidate evidence is useful for ranking, triage, and explanation.
-- Raw token overlap, edit similarity, and raw AST node similarity are retained only as weak cross-language proxies, not as primary semantic evidence.
-- Evidence fusion is most valuable as calibrated confidence and explanation, not as a replacement for execution.
-- The results support an empirical evidence hierarchy: surface plausibility, validity, structure, program obligations, and observed behavior.
+The active manuscript source is in:
 
-## Evidence Families
+```text
+paper_v2/main_v2.tex
+paper_v2/references_v2.bib
+paper_v2/main_v2.bbl
+```
 
-EviCode now organizes language-normalized evidence into four families:
-
-| Family | Examples | Role |
-|---|---|---|
-| Structural | loops, branches, nesting, CFG-size proxies, statement distribution | captures program organization across languages |
-| Behavioral | operators, returns, exceptions, calls, identifier roles, data-flow summaries | captures operation and value-movement evidence |
-| Complexity | cyclomatic complexity, decision density, expression density, assignment density | captures decision and expression structure |
-| Reliability | parse success, syntax validity, execution availability, confidence | captures whether evidence and behavior can be trusted |
-
-Family ablation shows that the families contribute different kinds of evidence. Behavioral-only evidence reaches F1 `0.389` and AUC `0.711`; structural-only evidence reaches F1 `0.329` and AUC `0.734`; removing reliability evidence has the largest static impact in the current implementation, reducing static F1 to `0.436`.
-
-## Dataset Snapshot
-
-| Setting | Value |
-|---|---:|
-| HumanEval-X verification examples | 2,952 |
-| Underlying tasks | 164 |
-| Positive pairs | 984 |
-| Controlled negative pairs | 1,968 |
-| External source-to-Java LLM translations | 37,650 |
-| External aligned-pair stress-test rows | 1,140 |
-| LLM generators | DeepSeekCoder, QwenCoder, StarCoder |
-
-## Results and Analysis
-
-### RQ1: Which Evidence Is Informative?
-
-The first result is a discontinuity between representation-based and behavior-based verification. Static evidence reaches useful ranking quality, but execution changes the task from estimating semantic plausibility to observing tested behavior.
-
-| Evidence group | Accuracy | F1 | ROC-AUC |
-|---|---:|---:|---:|
-| Lexical | 0.667 | 0.000 | 0.552 |
-| Syntactic | 0.667 | 0.000 | 0.589 |
-| Structural | 0.681 | 0.364 | 0.653 |
-| Semantic-static | 0.670 | 0.252 | 0.717 |
-| Dynamic | 0.929 | 0.904 | 0.947 |
-| Static fusion | 0.743 | 0.558 | 0.801 |
-| Static + example execution | 0.900 | 0.859 | 0.933 |
-| Static + full execution | 0.906 | 0.865 | 0.959 |
-| All evidence | 0.908 | 0.869 | 0.959 |
-
-![Main HumanEval-X F1 results](docs/readme_assets/main_results_f1.png)
-
-Static evidence has weaker thresholded F1 than execution, but its ROC-AUC of 0.801 shows that semantic plausibility is visible before execution. This matters for systems that need to prioritize candidates before paying for compilation, sandboxing, or full test execution.
-
-### Evidence Informativeness
-
-| Evidence source | Category | ROC-AUC | Mutual information |
-|---|---|---:|---:|
-| Full execution | Dynamic | 0.934 | 0.409 |
-| Example execution | Dynamic | 0.913 | 0.356 |
-| AST node similarity | Weak proxy | 0.550 | 0.109 |
-| Token overlap | Weak proxy | 0.739 | 0.097 |
-| Condition/operator patterns | Structural | 0.633 | 0.069 |
-| Identifier overlap | Semantic-static | 0.709 | 0.053 |
-
-![Evidence informativeness](docs/readme_assets/evidence_informativeness.png)
-
-Execution carries roughly four times as much individual label information as the strongest static feature. The static signals are still useful because they fail differently. Raw AST and token overlap are now treated as weak proxies, while normalized operator, control, identifier-role, and data-flow features are the primary static evidence family.
-
-### Evidence Hierarchy
-
-| Evidence level | Features | F1 | ROC-AUC | Delta F1 |
-|---|---:|---:|---:|---:|
-| Weak proxy | 8 | 0.461 | 0.805 | 0.461 |
-| Normalized program | 9 | 0.460 | 0.805 | -0.001 |
-| Normalized control/structure | 31 | 0.478 | 0.806 | 0.018 |
-| Normalized semantic-static | 45 | 0.558 | 0.801 | 0.081 |
-| Dynamic | 47 | 0.869 | 0.959 | 0.311 |
-
-![Evidence hierarchy](docs/readme_assets/information_gain_hierarchy.png)
-
-The hierarchy shows gradual static gains followed by a large dynamic transition. Normalized semantic-static evidence improves F1 to 0.558, while dynamic evidence adds the largest transition. This supports the view that verification follows progressive semantic observability rather than simple feature accumulation.
-
-### RQ2: Which Evidence Is Complementary?
-
-![Evidence complementarity heatmap](docs/readme_assets/evidence_complementarity_heatmap.png)
-
-Complementarity is more important than feature count. Highly correlated blocks show redundant evidence families, while lower-correlation signals expose different failure surfaces. Operator evidence, API evidence, identifier-role evidence, and execution are useful because they disagree for interpretable reasons.
-
-### RQ3: How Much Execution Is Necessary?
-
-![Execution budget comparison](docs/readme_assets/execution_budget_curve.png)
-
-HumanEval-X exposes example and full tests, but not normalized individual test budgets. The supported held-out evidence settings still show an important pattern: the first behavioral signal produces the largest gain. Static-only verification reaches F1 0.558, example execution reaches 0.879, and full execution reaches 0.904.
-
-![Cost-information analysis](docs/readme_assets/cost_information_pareto.png)
-
-Cost changes what evidence is worth collecting. Execution has the strongest absolute information, but cheap static evidence has high cost-normalized value for early triage.
-
-### RQ4: Can Evidence Explain Failures?
-
-![Failure detection matrix](docs/readme_assets/failure_detection_matrix.png)
-
-Evidence decomposition turns a binary incorrect label into diagnosable categories: syntax failure, API mismatch, data-flow mismatch, control-flow mismatch, and execution disagreement. This is important for repair and review workflows because the next action depends on why a candidate failed.
-
-### RQ5: External Validation and Calibration
-
-| Generator | Rows | Empirical correctness | Mean confidence | ROC-AUC |
-|---|---:|---:|---:|---:|
-| DeepSeekCoder | 18,007 | 0.259 | 0.037 | 0.500 |
-| QwenCoder | 8,966 | 0.191 | 0.057 | 0.445 |
-| StarCoder | 10,677 | 0.078 | 0.187 | 0.265 |
-| All source-to-Java translations | 37,650 | 0.191 | 0.084 | 0.406 |
-
-![LLM calibration](docs/readme_assets/llm_calibration_curve.png)
-
-When the static verifier is trained only on HumanEval-X Python-to-Java examples, it transfers moderately to Python-to-Java LLM translations but weakly to unseen source languages. This is an important negative result: language-normalized features do not automatically imply calibrated language-agnostic verification.
-
-| Source | Rows | Empirical correctness | Mean confidence | ROC-AUC |
-|---|---:|---:|---:|---:|
-| Python | 7,312 | 0.191 | 0.167 | 0.695 |
-| C# | 5,819 | 0.132 | 0.090 | 0.427 |
-| Ruby | 5,852 | 0.156 | 0.029 | 0.365 |
-| Swift | 1,297 | 0.357 | 0.092 | 0.361 |
-| Kotlin | 3,641 | 0.195 | 0.082 | 0.338 |
-| C | 6,662 | 0.205 | 0.064 | 0.309 |
-| C++ | 6,962 | 0.223 | 0.056 | 0.307 |
-
-![Confidence by graded LLM outcome](docs/readme_assets/llm_confidence_by_score.png)
-
-The graded LLM outcomes reveal calibration failure under broad source-language shift: parse-only candidates receive higher mean confidence than functionally correct candidates. This supports the paper's more careful claim that evidence decomposition is useful, but fusion weights must be trained or calibrated for the language families where they will be deployed.
-
-| External aligned-pair dataset | Rows | F1 | ROC-AUC |
-|---|---:|---:|---:|
-| CodeXGLUE C#-Java | 400 | 0.291 | 0.989 |
-| HumanEval-X C++-Java | 328 | 0.000 | 0.833 |
-| HumanEval-X Go-Java | 328 | 0.000 | 0.957 |
-| XLCoST C++-Java | 30 | 0.000 | 0.920 |
-| XLCoST C#-Java | 42 | 0.091 | 1.000 |
-
-### Metrics Are Evidence, Not Judges
-
-| Method | F1 | ROC-AUC | Interpretation |
-|---|---:|---:|---|
-| BLEU | 0.028 | 0.685 | Surface resemblance; poor correctness boundary |
-| CrystalBLEU | 0.022 | 0.714 | Surface resemblance with filtering |
-| TF-IDF | 0.530 | 0.727 | Better ranking, still non-semantic |
-| CodeBLEU | 0.559 | 0.728 | Structure-aware similarity proxy |
-| Execution | 0.904 | 0.947 | Behavior-observing evidence |
-| EviCode Static | 0.558 | 0.801 | Static ranking and triage |
-| EviCode All | 0.869 | 0.959 | Evidence-fused confidence |
-
-![Metric comparison](docs/readme_assets/metric_comparison_matrix.png)
-
-The metric comparison shows why similarity metrics should be interpreted as partial evidence sources rather than semantic judges.
-
-## Repository Contents
-
-| Path | Purpose |
-|---|---|
-| `src/evicode/` | Evidence extraction, feature handling, execution helpers, and fusion utilities |
-| `scripts/` | Resume-safe dataset, evidence, experiment, statistics, artifact, and paper scripts |
-| `configs/` | Reproducible experiment configurations |
-| `datasets/processed/` | Processed HumanEval-X verification examples |
-| `datasets/Predictions_by_LLMs/` | External source-to-Java LLM predictions tracked with Git LFS |
-| `experiments/` | Evidence and fusion outputs |
-| `statistics/` | Bootstrap and McNemar validation outputs |
-| `figures/`, `tables/` | Generated paper artifacts |
-| `paper/main.tex` | Single-file manuscript source |
-| `docs/` | Reproduction, architecture, user, and reviewer notes |
-
-See `docs/LANGUAGE_NORMALIZED_EVIDENCE.md` for the evidence-source classification and mathematical definition of the language-normalized profile features.
-
-## Setup
+The compiled PDF is intentionally not tracked in GitHub. Build it locally with:
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
-python -m pip install --upgrade pip
+cd paper_v2
+pdflatex -interaction=nonstopmode -halt-on-error main_v2.tex
+pdflatex -interaction=nonstopmode -halt-on-error main_v2.tex
+```
+
+The current paper figures used by `paper_v2/main_v2.tex` are tracked only under:
+
+```text
+outputs/authentic_only/figures/
+```
+
+## Current Study
+
+The current paper evaluates 30,979 execution-labelled CodeNetTrans-QS translations from seven source languages to Java, generated by DeepSeek-Coder, QwenCoder, and StarCoder. EviCode represents each source-candidate pair using 45 named, language-normalized semantic compatibility probes derived from 53 extractor outputs through an outcome-blind eligibility and de-duplication process.
+
+The analysis focuses on:
+
+- reference-free and execution-free verification at inference,
+- the 45-probe language-normalized evidence basis,
+- same-information static baselines,
+- model-capacity sensitivity for the explicit representation,
+- frozen code-embedding comparisons,
+- feature attribution, family ablation, calibration, and transfer,
+- the empirical Semantic Information Ladder.
+
+## Reproduction Entry Points
+
+Install the research dependencies:
+
+```bash
 python -m pip install -r requirements.txt
 python -m pip install -r requirements-dev.txt
+python -m pip install -r requirements-research.txt
 python -m pip install -e .
 ```
 
-Large prediction JSONL files are tracked with Git LFS. After cloning:
+Run the current extraction and analysis pipeline:
 
 ```bash
-git lfs install
-git lfs pull
+python authentic_only_study/extract.py --config authentic_only_study/config.yaml
+python authentic_only_study/analyze.py --config authentic_only_study/config.yaml
+python scripts/feature_basis_audit.py
+python scripts/authentic_same_information_baselines.py
+python scripts/model_capacity_ablation.py
 ```
 
-## Smoke Test
+Regenerate current-paper figures:
 
 ```bash
-python -m pytest
-python scripts/run_smoke.py --config configs/smoke.yaml --output-dir experiments/smoke --resume
+python authentic_only_study/visualizations.py
+python authentic_only_study/presentation_figures.py
+python authentic_only_study/conceptual_figure.py
 ```
 
-## Full Reproduction
+See `REPRODUCIBILITY.md` for the full current-paper reproduction notes.
 
-```bash
-python scripts/build_humanevalx.py --config configs/humanevalx.yaml --output-dir datasets/processed/humanevalx --resume
-python scripts/extract_evidence.py --config configs/humanevalx.yaml --input datasets/processed/humanevalx/verification_examples.jsonl --output-dir experiments/humanevalx/evidence --resume
-python scripts/refresh_static_evidence.py --config configs/humanevalx.yaml --examples datasets/processed/humanevalx/verification_examples.jsonl --evidence experiments/humanevalx/evidence/evidence.jsonl --output-dir experiments/humanevalx/evidence_rich --resume
-python scripts/run_experiments.py --config configs/humanevalx.yaml --input experiments/humanevalx/evidence_rich/evidence.jsonl --output-dir experiments/humanevalx/fusion_rich --resume
-python scripts/statistical_analysis.py --config configs/humanevalx.yaml --predictions experiments/humanevalx/fusion_rich/predictions.csv --output-dir statistics/humanevalx_rich --resume
-python scripts/analyze_evidence.py --config configs/humanevalx.yaml --examples datasets/processed/humanevalx/verification_examples.jsonl --evidence experiments/humanevalx/evidence_rich/evidence.jsonl --metrics experiments/humanevalx/fusion_rich/metrics.csv --output-dir results/analysis --resume
-python scripts/evaluate_llm_predictions.py --config configs/humanevalx.yaml --predictions-dir datasets/Predictions_by_LLMs --train-evidence experiments/humanevalx/evidence_rich/evidence.jsonl --output-dir results/llm_predictions --source-languages all --target-language Java --train-source-languages python --train-target-languages java --resume
-python scripts/external_dataset_validation.py --config configs/humanevalx.yaml --train-evidence experiments/humanevalx/evidence_rich/evidence.jsonl --output-dir results/external_validation --train-source-language python --train-target-language java --max-pairs 200 --resume
-python scripts/semantic_accumulation_analysis.py --config configs/humanevalx.yaml --examples datasets/processed/humanevalx/verification_examples.jsonl --evidence experiments/humanevalx/evidence_rich/evidence.jsonl --predictions experiments/humanevalx/fusion_rich/predictions.csv --output-dir results/semantic_accumulation --resume
-python scripts/generate_artifacts.py --config configs/humanevalx.yaml --dataset datasets/processed/humanevalx/verification_examples.jsonl --evidence experiments/humanevalx/evidence_rich/evidence.jsonl --metrics experiments/humanevalx/fusion_rich/metrics.csv --statistics-dir statistics/humanevalx_rich --output-dir results/humanevalx_rich --resume
-python scripts/build_paper.py --config configs/humanevalx.yaml --output-dir paper/output --resume --force
-```
+## Repository Layout
 
-More detail is available in `SETUP.md`, `REPRODUCIBILITY.md`, `PROJECT_STATUS.md`, and `docs/REPRODUCTION_GUIDE.md`.
+| Path | Purpose |
+|---|---|
+| `paper_v2/` | Current manuscript source and bibliography files |
+| `outputs/authentic_only/figures/` | Current paper figure artifacts referenced by the manuscript |
+| `authentic_only_study/` | Current CodeNetTrans-QS extraction, analysis, and visualization scripts |
+| `scripts/feature_basis_audit.py` | 53-to-45 probe-basis audit used in the current paper |
+| `scripts/model_capacity_ablation.py` | Learner-capacity sensitivity for the explicit EviCode representation |
+| `scripts/frozen_representation_ablation.py` | Frozen code-encoder representation experiments |
+| `src/evicode/` | Core feature extraction, execution helpers, and fusion utilities |
+| `datasets/Predictions_by_LLMs/` | Scored CodeNetTrans-QS generator outputs used by the current study |
+
+## Interpretation Boundary
+
+EviCode estimates plausibility and supports prioritization and diagnosis. It does not prove semantic equivalence. Static observations can expose agreement and disagreement in syntax, structure, control flow, operators, identifier roles, data flow, APIs, and complexity, but behavior remains unobserved unless execution evidence is acquired.
